@@ -430,6 +430,7 @@ function drawNode(cx: number, cy: number, nodeId: string, isInput: boolean,
       height: RECT_SIZE,
     });
   let activeOrNotClass = state[nodeId] ? "active" : "inactive";
+
   if (isInput) {
     let label = INPUTS[nodeId].label != null ?
         INPUTS[nodeId].label : nodeId;
@@ -437,7 +438,8 @@ function drawNode(cx: number, cy: number, nodeId: string, isInput: boolean,
     let text = nodeGroup.append("text").attr({
       class: "main-label",
       x: -10,
-      y: RECT_SIZE / 2, "text-anchor": "end"
+      y: RECT_SIZE / 2,
+      "text-anchor": "end"
     });
     if (/[_^]/.test(label)) {
       let myRe = /(.*?)([_^])(.)/g;
@@ -464,6 +466,26 @@ function drawNode(cx: number, cy: number, nodeId: string, isInput: boolean,
     }
     nodeGroup.classed(activeOrNotClass, true);
   }
+
+  if (!isInput) {
+    // draw the option labels
+    let text = nodeGroup.append("text").attr({
+      class: "option-label",
+      x: 0,
+      y: RECT_SIZE + 13,
+      "text-anchor": "start"
+    });
+    text.append("tspan").text('Remove');
+
+    text.on("click", function() {
+      //TODO: implement removal without reset
+      parametersChanged = true;
+      reset();
+    });
+
+    text.style("cursor", "pointer");
+  }
+
   if (!isInput) {
     // Draw the node's bias.
     nodeGroup.append("rect")
@@ -588,7 +610,7 @@ function drawNetwork(network: nn.Node[][]): void {
           nextNumNodes <= numNodes) {
         calloutThumb.style({
           display: null,
-          top: `${20 + 3 + cy}px`,
+          top: `${20 + 3 + 13 + cy}px`,
           left: `${cx}px`
         });
         idWithCallout = node.id;

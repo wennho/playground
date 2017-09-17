@@ -653,6 +653,13 @@ g.column rect {
   font-weight: 300;
 }
 
+#network svg .option-label {
+  font-size: 10px;
+  fill: #333;
+  font-weight: 300;
+  color: gray;
+}
+
 .axis line {
   fill: none;
   stroke: #777;
