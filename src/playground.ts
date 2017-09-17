@@ -167,7 +167,7 @@ let colorScale = d3.scale.linear<string>()
 let iter = 0;
 let trainData: Example2D[] = [];
 let testData: Example2D[] = [];
-let network: nn.Node[][] = null;
+let n: nn.Network = null;
 let lossTrain = 0;
 let lossTest = 0;
 let player = new Player();
@@ -370,7 +370,7 @@ function makeGUI() {
         .getBoundingClientRect().width;
     if (newWidth !== mainWidth) {
       mainWidth = newWidth;
-      drawNetwork(network);
+      drawNetwork(n.network);
       updateUI(true);
     }
   });
@@ -478,7 +478,7 @@ function drawNode(cx: number, cy: number, nodeId: string, isInput: boolean,
     text.append("tspan").text('Remove');
 
     text.on("click", function() {
-      //TODO: implement removal without reset
+      n.removeNode(node);
       parametersChanged = true;
       reset();
     });
@@ -517,15 +517,15 @@ function drawNode(cx: number, cy: number, nodeId: string, isInput: boolean,
       selectedNodeId = nodeId;
       div.classed("hovered", true);
       nodeGroup.classed("hovered", true);
-      updateDecisionBoundary(network, false);
+      updateDecisionBoundary(n.network, false);
       heatMap.updateBackground(boundary[nodeId], state.discretize);
     })
     .on("mouseleave", function() {
       selectedNodeId = null;
       div.classed("hovered", false);
       nodeGroup.classed("hovered", false);
-      updateDecisionBoundary(network, false);
-      heatMap.updateBackground(boundary[nn.getOutputNode(network).id],
+      updateDecisionBoundary(n.network, false);
+      heatMap.updateBackground(boundary[nn.getOutputNode(n.network).id],
           state.discretize);
     });
   if (isInput) {
@@ -567,7 +567,7 @@ function drawNetwork(network: nn.Node[][]): void {
     .classed("core", true)
     .attr("transform", `translate(${padding},${padding})`);
   // Draw the network layer by layer.
-  let numLayers = network.length;
+  let numLayers = n.network.length;
   let featureWidth = 118;
   let layerScale = d3.scale.ordinal<number, number>()
       .domain(d3.range(1, numLayers - 1))
@@ -619,7 +619,7 @@ function drawNetwork(network: nn.Node[][]): void {
       // Draw links.
       for (let j = 0; j < node.inputLinks.length; j++) {
         let link = node.inputLinks[j];
-        let path: SVGPathElement = drawLink(link, node2coord, network,
+        let path: SVGPathElement = drawLink(link, node2coord, n.network,
             container, j === 0, j, node.inputLinks.length).node() as any;
         // Show callout to weights.
         let prevLayer = network[layerIdx - 1];
@@ -650,7 +650,7 @@ function drawNetwork(network: nn.Node[][]): void {
   // Draw links.
   for (let i = 0; i < node.inputLinks.length; i++) {
     let link = node.inputLinks[i];
-    drawLink(link, node2coord, network, container, i === 0, i,
+    drawLink(link, node2coord, n.network, container, i === 0, i,
         node.inputLinks.length);
   }
   // Adjust the height of the svg.
@@ -684,7 +684,7 @@ function addPlusMinusControl(x: number, layerIdx: number) {
         if (numNeurons >= 8) {
           return;
         }
-        state.networkShape[i]++;
+        n.addNode(i);
         parametersChanged = true;
         reset();
       })
@@ -699,7 +699,7 @@ function addPlusMinusControl(x: number, layerIdx: number) {
         if (numNeurons <= 1) {
           return;
         }
-        state.networkShape[i]--;
+        n.removeNode(n.network[i+1][0]); // remove the first node
         parametersChanged = true;
         reset();
       })
@@ -861,13 +861,13 @@ function getLoss(network: nn.Node[][], dataPoints: Example2D[]): number {
 
 function updateUI(firstStep = false) {
   // Update the links visually.
-  updateWeightsUI(network, d3.select("g.core"));
+  updateWeightsUI(n.network, d3.select("g.core"));
   // Update the bias values visually.
-  updateBiasesUI(network);
+  updateBiasesUI(n.network);
   // Get the decision boundary of the network.
-  updateDecisionBoundary(network, firstStep);
+  updateDecisionBoundary(n.network, firstStep);
   let selectedId = selectedNodeId != null ?
-      selectedNodeId : nn.getOutputNode(network).id;
+      selectedNodeId : nn.getOutputNode(n.network).id;
   heatMap.updateBackground(boundary[selectedId], state.discretize);
 
   // Update all decision boundaries.
@@ -921,15 +921,15 @@ function oneStep(): void {
   iter++;
   trainData.forEach((point, i) => {
     let input = constructInput(point.x, point.y);
-    nn.forwardProp(network, input);
-    nn.backProp(network, point.label, nn.Errors.SQUARE);
+    nn.forwardProp(n.network, input);
+    nn.backProp(n.network, point.label, nn.Errors.SQUARE);
     if ((i + 1) % state.batchSize === 0) {
-      nn.updateWeights(network, state.learningRate, state.regularizationRate);
+      nn.updateWeights(n.network, state.learningRate, state.regularizationRate);
     }
   });
   // Compute the loss.
-  lossTrain = getLoss(network, trainData);
-  lossTest = getLoss(network, testData);
+  lossTrain = getLoss(n.network, trainData);
+  lossTest = getLoss(n.network, testData);
   updateUI();
 }
 
@@ -949,6 +949,11 @@ export function getOutputWeights(network: nn.Node[][]): number[] {
 }
 
 function reset(onStartup=false) {
+
+  if (!onStartup) {
+    state.networkShape = n.getShape();
+  }
+
   lineChart.reset();
   state.serialize();
   if (!onStartup) {
@@ -960,17 +965,21 @@ function reset(onStartup=false) {
   d3.select("#layers-label").text("Hidden layer" + suffix);
   d3.select("#num-layers").text(state.numHiddenLayers);
 
-  // Make a simple network.
-  iter = 0;
-  let numInputs = constructInput(0 , 0).length;
-  let shape = [numInputs].concat(state.networkShape).concat([1]);
-  let outputActivation = (state.problem === Problem.REGRESSION) ?
-      nn.Activations.LINEAR : nn.Activations.TANH;
-  network = nn.buildNetwork(shape, state.activation, outputActivation,
-      state.regularization, constructInputIds(), state.initZero);
-  lossTrain = getLoss(network, trainData);
-  lossTest = getLoss(network, testData);
-  drawNetwork(network);
+  if (onStartup) {
+      // Make a simple network.
+      iter = 0;
+      let numInputs = constructInput(0, 0).length;
+      let shape = [numInputs].concat(state.networkShape).concat([1]);
+      let outputActivation = (state.problem === Problem.REGRESSION) ?
+          nn.Activations.LINEAR : nn.Activations.TANH;
+      n = new nn.Network(shape, state.activation, outputActivation,
+          state.regularization, constructInputIds(), state.initZero);
+  }
+
+  lossTrain = getLoss(n.network, trainData);
+  lossTest = getLoss(n.network, testData);
+
+  drawNetwork(n.network);
   updateUI(true);
 };
 

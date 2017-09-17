@@ -13,6 +13,127 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ==============================================================================*/
 
+import {State} from "./state";
+
+export class Network {
+  network: Node[][];
+  nextNodeId: number;
+  activation: ActivationFunction;
+  initZero:boolean;
+  regularization:RegularizationFunction;
+
+  /**
+   * Builds a neural network.
+   *
+   * @param networkShape The shape of the network. E.g. [1, 2, 3, 1] means
+   *   the network will have one input node, 2 nodes in first hidden layer,
+   *   3 nodes in second hidden layer and 1 output node.
+   * @param activation The activation function of every hidden node.
+   * @param outputActivation The activation function for the output nodes.
+   * @param regularization The regularization function that computes a penalty
+   *     for a given weight (parameter) in the network. If null, there will be
+   *     no regularization.
+   * @param inputIds List of ids for the input nodes.
+   */
+  constructor(
+      networkShape: number[], activation: ActivationFunction,
+      outputActivation: ActivationFunction,
+      regularization: RegularizationFunction,
+      inputIds: string[], initZero?: boolean) {
+      let numLayers = networkShape.length;
+      this.nextNodeId = 1;
+      /** List of layers, with each layer being a list of nodes. */
+      this.network = [];
+      this.initZero = initZero;
+      this.activation = activation;
+      this.regularization = regularization;
+      for (let layerIdx = 0; layerIdx < numLayers; layerIdx++) {
+          let isOutputLayer = layerIdx === numLayers - 1;
+          let isInputLayer = layerIdx === 0;
+          let currentLayer: Node[] = [];
+          this.network .push(currentLayer);
+          let numNodes = networkShape[layerIdx];
+          for (let i = 0; i < numNodes; i++) {
+              let nodeId = this.nextNodeId.toString();
+              if (isInputLayer) {
+                  nodeId = inputIds[i];
+              } else {
+                  this.nextNodeId++;
+              }
+              let node = new Node(nodeId,
+                  isOutputLayer ? outputActivation : activation, initZero);
+              currentLayer.push(node);
+              if (layerIdx >= 1) {
+                  // Add links from nodes in the previous layer to this node.
+                  for (let j = 0; j < this.network [layerIdx - 1].length; j++) {
+                      let prevNode = this.network [layerIdx - 1][j];
+                      let link = new Link(prevNode, node, regularization, initZero);
+                      prevNode.outputs.push(link);
+                      node.inputLinks.push(link);
+                  }
+              }
+          }
+      }
+  }
+
+  getShape() : number[] {
+    let shape = [];
+    for (let i=1; i<this.network.length-1; i++) { // we can skip the input and output layers
+        shape.push(this.network[i].length);
+    }
+    return shape;
+  }
+
+  // assume this is an intermediate node
+  removeNode(node: Node) {
+      // Remove links
+      for (let i=0; i<node.inputLinks.length; i++) {
+          node.inputLinks[i].source.removeOutput(node.id);
+      }
+      for (let i=0; i<node.outputs.length; i++) {
+          node.outputs[i].dest.removeInput(node.id);
+      }
+
+      // remove node from network
+      let found = false;
+      for (let i=1; i<this.network.length; i++) { // we can skip the input layers
+          let index = this.network[i].map(function(x) {return x.id; }).indexOf(node.id);
+          if (index > -1) {
+              this.network[i].splice(index, 1);
+              found = true;
+              break;
+          }
+      }
+      if (!found) {
+          throw new Error ("cannot find node to remove");
+      }
+  }
+
+  // layer 0 corresponds to the first hidden layer
+  addNode(layer:number) {
+      this.nextNodeId++;
+
+      let node = new Node(this.nextNodeId.toString(), this.activation, this.initZero);
+      this.network[layer+1].push(node);
+
+      // Add links from nodes in the previous layer to this node.
+      for (let j = 0; j < this.network [layer].length; j++) {
+          let prevNode = this.network [layer][j];
+          let link = new Link(prevNode, node, this.regularization, this.initZero);
+          prevNode.outputs.push(link);
+          node.inputLinks.push(link);
+      }
+
+      // add links from the next layer to this node
+      for (let j = 0; j < this.network [layer+2].length; j++) {
+          let nextNode = this.network [layer+2][j];
+          let link = new Link(node, nextNode, this.regularization, this.initZero);
+          nextNode.inputLinks.push(link);
+          node.outputs.push(link);
+      }
+  }
+}
+
 /**
  * A node in a neural network. Each node has a state
  * (total input, output, and their respectively derivatives) which changes
@@ -66,6 +187,24 @@ export class Node {
     }
     this.output = this.activation.output(this.totalInput);
     return this.output;
+  }
+
+  removeOutput(nodeId: string) {
+    let index = this.outputs.map(function(x) {return x.dest.id; }).indexOf(nodeId);
+    if (index > -1) {
+      this.outputs.splice(index, 1);
+    } else {
+      throw new Error('Unable to remove output node - node not found');
+    }
+  }
+
+  removeInput(nodeId: string) {
+      let index = this.inputLinks.map(function(x) {return x.source.id; }).indexOf(nodeId);
+      if (index > -1) {
+          this.inputLinks.splice(index, 1);
+      } else {
+          throw new Error('Unable to remove input node - node not found');
+      }
   }
 }
 
@@ -188,57 +327,6 @@ export class Link {
   }
 }
 
-/**
- * Builds a neural network.
- *
- * @param networkShape The shape of the network. E.g. [1, 2, 3, 1] means
- *   the network will have one input node, 2 nodes in first hidden layer,
- *   3 nodes in second hidden layer and 1 output node.
- * @param activation The activation function of every hidden node.
- * @param outputActivation The activation function for the output nodes.
- * @param regularization The regularization function that computes a penalty
- *     for a given weight (parameter) in the network. If null, there will be
- *     no regularization.
- * @param inputIds List of ids for the input nodes.
- */
-export function buildNetwork(
-    networkShape: number[], activation: ActivationFunction,
-    outputActivation: ActivationFunction,
-    regularization: RegularizationFunction,
-    inputIds: string[], initZero?: boolean): Node[][] {
-  let numLayers = networkShape.length;
-  let id = 1;
-  /** List of layers, with each layer being a list of nodes. */
-  let network: Node[][] = [];
-  for (let layerIdx = 0; layerIdx < numLayers; layerIdx++) {
-    let isOutputLayer = layerIdx === numLayers - 1;
-    let isInputLayer = layerIdx === 0;
-    let currentLayer: Node[] = [];
-    network.push(currentLayer);
-    let numNodes = networkShape[layerIdx];
-    for (let i = 0; i < numNodes; i++) {
-      let nodeId = id.toString();
-      if (isInputLayer) {
-        nodeId = inputIds[i];
-      } else {
-        id++;
-      }
-      let node = new Node(nodeId,
-          isOutputLayer ? outputActivation : activation, initZero);
-      currentLayer.push(node);
-      if (layerIdx >= 1) {
-        // Add links from nodes in the previous layer to this node.
-        for (let j = 0; j < network[layerIdx - 1].length; j++) {
-          let prevNode = network[layerIdx - 1][j];
-          let link = new Link(prevNode, node, regularization, initZero);
-          prevNode.outputs.push(link);
-          node.inputLinks.push(link);
-        }
-      }
-    }
-  }
-  return network;
-}
 
 /**
  * Runs a forward propagation of the provided input through the provided
