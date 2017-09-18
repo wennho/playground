@@ -160,10 +160,18 @@ let linkWidthScale = d3.scale.linear()
   .domain([0, 5])
   .range([1, 10])
   .clamp(true);
+let linkErrorWidthScale = d3.scale.linear()
+    .domain([0, 5])
+    .range([1, 10])
+    .clamp(true);
 let colorScale = d3.scale.linear<string>()
-                     .domain([-1, 0, 1])
+                     .domain([-10, 0, 10])
                      .range(["#f59322", "#e8eaeb", "#0877bd"])
                      .clamp(true);
+let errorColorScale = d3.scale.linear<string>()
+                      .domain([-10, 0, 10])
+                      .range(["#505050", "#e8eaeb", "#505050"])
+                      .clamp(true);
 let iter = 0;
 let trainData: Example2D[] = [];
 let testData: Example2D[] = [];
@@ -383,6 +391,12 @@ function makeGUI() {
   }
 }
 
+function updateNodeErrorUI(network: nn.Node[][]) {
+    nn.forEachNode(network, true, node => {
+        d3.select(`text#error-${node.id}`).text('Error: ' + (node.error*100).toPrecision(3));
+    });
+}
+
 function updateBiasesUI(network: nn.Node[][]) {
   nn.forEachNode(network, true, node => {
     d3.select(`rect#bias-${node.id}`).style("fill", colorScale(node.bias));
@@ -404,6 +418,11 @@ function updateWeightsUI(network: nn.Node[][], container: d3.Selection<any>) {
               "stroke": colorScale(link.weight)
             })
             .datum(link);
+        container.select(`#errorline${link.source.id}-${link.dest.id}`)
+            .style({
+                "stroke-width": linkWidthScale(Math.abs(link.error*100)),
+                "stroke": errorColorScale(link.error*100)
+            });
       }
     }
   }
@@ -476,14 +495,23 @@ function drawNode(cx: number, cy: number, nodeId: string, isInput: boolean,
       "text-anchor": "start"
     });
     text.append("tspan").text('Remove');
-
     text.on("click", function() {
       n.removeNode(node);
       parametersChanged = true;
       reset();
     });
-
     text.style("cursor", "pointer");
+
+
+    let errorText = nodeGroup.append("text").attr({
+        class: "option-label",
+        id: `error-${nodeId}`,
+        x: RECT_SIZE + 7,
+        y: RECT_SIZE - 4,
+        "text-anchor": "start"
+    });
+    errorText.text('Error:');
+
   }
 
   if (!isInput) {
@@ -619,11 +647,15 @@ function drawNetwork(network: nn.Node[][]): void {
       // Draw links.
       for (let j = 0; j < node.inputLinks.length; j++) {
         let link = node.inputLinks[j];
+
         let path: SVGPathElement = drawLink(link, node2coord, n.network,
             container, j === 0, j, node.inputLinks.length).node() as any;
         // Show callout to weights.
         let prevLayer = network[layerIdx - 1];
         let lastNodePrevLayer = prevLayer[prevLayer.length - 1];
+
+
+        // draw callout box
         if (targetIdWithCallout == null &&
             i === numNodes - 1 &&
             link.source.id === lastNodePrevLayer.id &&
@@ -745,6 +777,9 @@ function updateHoverCard(type: HoverType, nodeOrLink?: nn.Node | nn.Link,
   let value = (type === HoverType.WEIGHT) ?
     (nodeOrLink as nn.Link).weight :
     (nodeOrLink as nn.Node).bias;
+  let error = (type === HoverType.WEIGHT) ?
+      (nodeOrLink as nn.Link).error :
+      (nodeOrLink as nn.Node).error;
   let name = (type === HoverType.WEIGHT) ? "Weight" : "Bias";
   hovercard.style({
     "left": `${coordinates[0] + 20}px`,
@@ -755,6 +790,9 @@ function updateHoverCard(type: HoverType, nodeOrLink?: nn.Node | nn.Link,
   hovercard.select(".value")
     .style("display", null)
     .text(value.toPrecision(2));
+  hovercard.select(".error-value")
+      .style("display", null)
+      .text((error*100).toPrecision(3));
   hovercard.select("input")
     .property("value", value.toPrecision(2))
     .style("display", "none");
@@ -779,10 +817,9 @@ function drawLink(
   };
   let diagonal = d3.svg.diagonal().projection(d => [d.y, d.x]);
   line.attr({
-    "marker-start": "url(#markerArrow)",
-    class: "link",
-    id: "link" + input.source.id + "-" + input.dest.id,
-    d: diagonal(datum, 0)
+      "d" : diagonal(datum, 0),
+      class: "errorlink",
+      id: "errorline" + input.source.id + "-" + input.dest.id,
   });
 
   // Add an invisible thick link that will be used for
@@ -795,6 +832,15 @@ function drawLink(
     }).on("mouseleave", function() {
       updateHoverCard(null);
     });
+
+  // add another line behind to show error state
+  container.append("path").attr({
+      "marker-start": "url(#markerArrow)",
+      class: "link",
+      id: "link" + input.source.id + "-" + input.dest.id,
+      d: diagonal(datum, 0)
+  });
+
   return line;
 }
 
@@ -864,6 +910,8 @@ function updateUI(firstStep = false) {
   updateWeightsUI(n.network, d3.select("g.core"));
   // Update the bias values visually.
   updateBiasesUI(n.network);
+  // Update node errors visually
+  updateNodeErrorUI(n.network);
   // Get the decision boundary of the network.
   updateDecisionBoundary(n.network, firstStep);
   let selectedId = selectedNodeId != null ?

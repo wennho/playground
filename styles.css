@@ -707,9 +707,13 @@ g.column rect {
 }
 
 #network .core .link {
-  stroke-dasharray: 9 1;
+  stroke-dasharray: 7 3;
   stroke-dashoffset: 1;
   /*-webkit-animation: 0.5s linear 0s infinite flowing;*/
+}
+
+#network .core .errorlink {
+  fill:none;
 }
 
 /** Invisible thick links used for showing weight values on mouse hover. */
