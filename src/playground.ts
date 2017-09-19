@@ -165,7 +165,7 @@ let linkErrorWidthScale = d3.scale.linear()
     .range([1, 10])
     .clamp(true);
 let colorScale = d3.scale.linear<string>()
-                     .domain([-5, 0, 5])
+                     .domain([-1, 0, 1])
                      .range(["#f59322", "#e8eaeb", "#0877bd"])
                      .clamp(true);
 let errorColorScale = d3.scale.linear<string>()
@@ -816,29 +816,32 @@ function drawLink(
     }
   };
   let diagonal = d3.svg.diagonal().projection(d => [d.y, d.x]);
+
+  // back-most line to show error rate
   line.attr({
       "d" : diagonal(datum, 0),
       class: "errorlink",
       id: "errorline" + input.source.id + "-" + input.dest.id,
   });
 
-  // Add an invisible thick link that will be used for
-  // showing the weight value on hover.
+  // line to show weights
+  container.append("path").attr({
+      "marker-start": "url(#markerArrow)",
+      class: "link",
+      id: "link" + input.source.id + "-" + input.dest.id,
+      d: diagonal(datum, 0)
+  });
+
+
+  // Add an invisible thick link that will be used for showing the weight value on hover.
+  // This has to be last so that it's on top.
   container.append("path")
     .attr("d", diagonal(datum, 0))
     .attr("class", "link-hover")
     .on("mouseenter", function() {
       updateHoverCard(HoverType.WEIGHT, input, d3.mouse(this));
     }).on("mouseleave", function() {
-      updateHoverCard(null);
-    });
-
-  // add another line behind to show error state
-  container.append("path").attr({
-      "marker-start": "url(#markerArrow)",
-      class: "link",
-      id: "link" + input.source.id + "-" + input.dest.id,
-      d: diagonal(datum, 0)
+    updateHoverCard(null);
   });
 
   return line;
