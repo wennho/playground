@@ -95,7 +95,8 @@ export class HeatMap {
       .style("height", (height - 2 * padding) + "px")
       .style("position", "absolute")
       .style("top", `${padding}px`)
-      .style("left", `${padding}px`);
+      .style("left", `${padding}px`)
+      .attr('id','output-node');
 
     if (!this.settings.noSvg) {
       this.svg = container.append("svg").attr({

@@ -751,6 +751,14 @@ g.column rect {
   left: -2px;
 }
 
+#network .canvas.selected canvas {
+  border: 2px solid brown;
+}
+
+#heatmap.selected canvas  {
+  border: 2px solid brown;
+}
+
 /* Hidden layers column */
 
 .hidden-layers.column {

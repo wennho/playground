@@ -61,7 +61,7 @@ export class Network {
                   this.nextNodeId++;
               }
               let node = new Node(nodeId,
-                  isOutputLayer ? outputActivation : activation, initZero);
+                  isOutputLayer ? outputActivation : activation, layerIdx,initZero);
               currentLayer.push(node);
               if (layerIdx >= 1) {
                   // Add links from nodes in the previous layer to this node.
@@ -84,7 +84,7 @@ export class Network {
     return shape;
   }
 
-  // assume this is an intermediate node
+
   removeNode(node: Node) {
       // Remove links
       for (let i=0; i<node.inputLinks.length; i++) {
@@ -96,7 +96,7 @@ export class Network {
 
       // remove node from network
       let found = false;
-      for (let i=1; i<this.network.length; i++) { // we can skip the input layers
+      for (let i=0; i<this.network.length; i++) {
           let index = this.network[i].map(function(x) {return x.id; }).indexOf(node.id);
           if (index > -1) {
               this.network[i].splice(index, 1);
@@ -109,28 +109,54 @@ export class Network {
       }
   }
 
+  findNode(nodeId: string) {
+
+    for (let i=0; i<this.network.length; i++) {
+      let index = this.network[i].map((x) => {return x.id; }).indexOf(nodeId);
+      if (index > -1) {
+        return this.network[i][index];
+      }
+    }
+
+    throw new Error ("cannot find node to remove");
+
+  }
+
   // layer 0 corresponds to the first hidden layer
   addNode(layer:number) {
       this.nextNodeId++;
 
-      let node = new Node(this.nextNodeId.toString(), this.activation, this.initZero);
+      let node = new Node(this.nextNodeId.toString(), this.activation, layer+1, this.initZero);
       this.network[layer+1].push(node);
 
       // Add links from nodes in the previous layer to this node.
       for (let j = 0; j < this.network [layer].length; j++) {
           let prevNode = this.network [layer][j];
-          let link = new Link(prevNode, node, this.regularization, this.initZero);
-          prevNode.outputs.push(link);
-          node.inputLinks.push(link);
+          this.addLink(prevNode,node);
       }
 
       // add links from the next layer to this node
       for (let j = 0; j < this.network [layer+2].length; j++) {
           let nextNode = this.network [layer+2][j];
+          this.addLink(node,nextNode);
           let link = new Link(node, nextNode, this.regularization, this.initZero);
           nextNode.inputLinks.push(link);
           node.outputs.push(link);
       }
+  }
+
+  addInput(nodeId) {
+    let node = new Node(nodeId, this.activation, 0, this.initZero);
+    this.network[0].push(node);
+    for (let i=0; i<this.network[1].length; i++) {
+      this.addLink(node, this.network[1][i]);
+    }
+  }
+
+  addLink(fromNode:Node, toNode:Node) {
+    let link = new Link(fromNode, toNode, this.regularization, this.initZero);
+    fromNode.outputs.push(link);
+    toNode.inputLinks.push(link);
   }
 }
 
@@ -166,16 +192,20 @@ export class Node {
   /** Activation function that takes total input and returns node's output */
   activation: ActivationFunction;
 
-  // Saved average error derivative
+  // Saved error statistics
   error = 0;
   accError = 0;
   currError = 0;
+
+  layer : number;
+
   /**
    * Creates a new node with the provided id and activation function.
    */
-  constructor(id: string, activation: ActivationFunction, initZero?: boolean) {
+  constructor(id: string, activation: ActivationFunction, layer:number, initZero?: boolean) {
     this.id = id;
     this.activation = activation;
+    this.layer = layer;
     if (initZero) {
       this.bias = 0;
     }
@@ -209,6 +239,18 @@ export class Node {
       } else {
           throw new Error('Unable to remove input node - node not found');
       }
+  }
+
+  isLinked(node: Node): boolean {
+    let index = this.outputs.map(function(x) {return x.dest.id; }).indexOf(node.id);
+    if (index > -1) {
+      return true;
+    }
+    index = this.inputLinks.map(function(x) {return x.source.id; }).indexOf(node.id);
+    if (index > -1) {
+      return true;
+    }
+    return false;
   }
 }
 

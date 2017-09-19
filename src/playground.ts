@@ -33,9 +33,13 @@ let mainWidth;
 const enum Mode {
   None,
   DeleteEdge,
+  AddEdge,
 }
 
 let mode = Mode.None;
+
+let selectedNode : nn.Node = null;
+let selectedDiv = null;
 
 // More scrolling
 d3.select(".more button").on("click", function() {
@@ -299,6 +303,8 @@ function makeGUI() {
   d3.selectAll('input[name="mode"]').on("change", function() {
     if (this.value == 'deleteEdge') {
       mode = Mode.DeleteEdge;
+    } else if (this.value == 'addEdge') {
+      mode = Mode.AddEdge;
     } else {
       mode = Mode.None;
     }
@@ -572,11 +578,31 @@ function drawNode(cx: number, cy: number, nodeId: string, isInput: boolean,
       updateDecisionBoundary(n.network, false);
       heatMap.updateBackground(boundary[nn.getOutputNode(n.network).id],
           state.discretize);
+    })
+    .on("click", function(){
+      if (mode == Mode.AddEdge) {
+        selectNode(div, node);
+      }
     });
+
   if (isInput) {
     div.on("click", function() {
+      
+      if (mode == Mode.AddEdge) {
+        selectNode(div, n.findNode(nodeId));
+        return;
+      }
+
+      // add or remove input node
       state[nodeId] = !state[nodeId];
       parametersChanged = true;
+
+      if (state[nodeId]) {
+        n.addInput(nodeId);
+      } else {
+        n.removeNode(n.findNode(nodeId));
+      }
+
       reset();
     });
     div.style("cursor", "pointer");
@@ -588,6 +614,35 @@ function drawNode(cx: number, cy: number, nodeId: string, isInput: boolean,
       xDomain, div, {noSvg: true});
   div.datum({heatmap: nodeHeatMap, id: nodeId});
 
+}
+
+function selectNode(div, node) {
+  if (selectedNode == null) {
+    selectedNode = node;
+    selectedDiv = div;
+    div.classed("selected", true);
+    d3.select('#info').text('Node ' + node.id + ' selected. Click on another node to create a link.');
+  } else if (selectedNode.id == node.id) {
+    selectedNode = null;
+    selectedDiv = null;
+    div.classed("selected", false);
+    d3.select('#info').text('Node ' + node.id + ' unselected.');
+  } else {
+    // first check that link does not already exist
+    if (selectedNode.layer == node.layer || selectedNode.isLinked(node)) {
+      d3.select('#info').text('Cannot create link. Invalid target.');
+      return;
+    }
+
+    let fromNode = selectedNode.layer < node.layer ? selectedNode : node;
+    let toNode = selectedNode.layer > node.layer ? selectedNode : node;
+    n.addLink(fromNode, toNode);
+    d3.select('#info').text('Link between nodes ' + node.id + ' and ' + selectedNode.id + ' created.');
+    selectedNode = null;
+    selectedDiv.classed("selected", false);
+    selectedDiv = null;
+    reset();
+  }
 }
 
 // Draw network
@@ -691,9 +746,17 @@ function drawNetwork(network: nn.Node[][]): void {
     }
   }
 
-  // Draw the output node separately.
+  // Output node is drawn separately
   cx = width + RECT_SIZE / 2;
   let node = network[numLayers - 1][0];
+
+  // add click listener
+  d3.select('#heatmap').on('click', function(){
+    if (mode == Mode.AddEdge) {
+      selectNode(d3.select('#heatmap'), node);
+    }
+  });
+
   let cy = nodeIndexScale(0) + RECT_SIZE / 2;
   node2coord[node.id] = {cx, cy};
   // Draw links.
