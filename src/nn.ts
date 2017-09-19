@@ -122,26 +122,23 @@ export class Network {
 
   }
 
-  // layer 0 corresponds to the first hidden layer
+  // layer 0 corresponds to the input layer
   addNode(layer:number) {
       this.nextNodeId++;
 
-      let node = new Node(this.nextNodeId.toString(), this.activation, layer+1, this.initZero);
-      this.network[layer+1].push(node);
+      let node = new Node(this.nextNodeId.toString(), this.activation, layer, this.initZero);
+      this.network[layer].push(node);
 
       // Add links from nodes in the previous layer to this node.
-      for (let j = 0; j < this.network [layer].length; j++) {
-          let prevNode = this.network [layer][j];
+      for (let j = 0; j < this.network [layer-1].length; j++) {
+          let prevNode = this.network [layer-1][j];
           this.addLink(prevNode,node);
       }
 
       // add links from the next layer to this node
-      for (let j = 0; j < this.network [layer+2].length; j++) {
-          let nextNode = this.network [layer+2][j];
+      for (let j = 0; j < this.network [layer+1].length; j++) {
+          let nextNode = this.network [layer+1][j];
           this.addLink(node,nextNode);
-          let link = new Link(node, nextNode, this.regularization, this.initZero);
-          nextNode.inputLinks.push(link);
-          node.outputs.push(link);
       }
   }
 
@@ -154,6 +151,11 @@ export class Network {
   }
 
   addLink(fromNode:Node, toNode:Node) {
+    // check link does not already exist
+    if (fromNode.isLinked(toNode)) {
+      throw new Error("Cannot create duplicate link");
+    }
+
     let link = new Link(fromNode, toNode, this.regularization, this.initZero);
     fromNode.outputs.push(link);
     toNode.inputLinks.push(link);

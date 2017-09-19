@@ -587,7 +587,7 @@ function drawNode(cx: number, cy: number, nodeId: string, isInput: boolean,
 
   if (isInput) {
     div.on("click", function() {
-      
+
       if (mode == Mode.AddEdge) {
         selectNode(div, n.findNode(nodeId));
         return;
@@ -796,7 +796,7 @@ function addPlusMinusControl(x: number, layerIdx: number) {
         if (numNeurons >= 8) {
           return;
         }
-        n.addNode(i);
+        n.addNode(i+1);
         parametersChanged = true;
         reset();
       })
