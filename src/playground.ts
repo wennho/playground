@@ -30,6 +30,13 @@ import {AppendingLineChart} from "./linechart";
 
 let mainWidth;
 
+const enum Mode {
+  None,
+  DeleteEdge,
+}
+
+let mode = Mode.None;
+
 // More scrolling
 d3.select(".more button").on("click", function() {
   let position = 800;
@@ -288,6 +295,16 @@ function makeGUI() {
   });
   // Check/uncheck the checbox according to the current state.
   discretize.property("checked", state.discretize);
+
+  d3.selectAll('input[name="mode"]').on("change", function() {
+    if (this.value == 'deleteEdge') {
+      mode = Mode.DeleteEdge;
+    } else {
+      mode = Mode.None;
+    }
+
+  });
+
 
   let percTrain = d3.select("#percTrainData").on("input", function() {
     state.percTrainData = this.value;
@@ -753,14 +770,26 @@ function updateHoverCard(type: HoverType, nodeOrLink?: nn.Node | nn.Link,
     d3.select("#svg").on("click", null);
     return;
   }
+
+  // actions when the node or link is clicked
   d3.select("#svg").on("click", () => {
+
+    if (mode === Mode.DeleteEdge && nodeOrLink instanceof nn.Link) {
+      nodeOrLink.remove();
+      let hovercard = d3.select("#hovercard");
+      hovercard.style("display", "none");
+      d3.select("#svg").on("click", null);
+      reset();
+      return;
+    }
+
     hovercard.select(".value").style("display", "none");
     let input = hovercard.select("input");
     input.style("display", null);
     input.on("input", function() {
       if (this.value != null && this.value !== "") {
         if (type === HoverType.WEIGHT) {
-          (nodeOrLink as nn.Link).weight = +this.value;
+          // (nodeOrLink as nn.Link).weight = +this.value;
         } else {
           (nodeOrLink as nn.Node).bias = +this.value;
         }

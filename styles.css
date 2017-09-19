@@ -846,6 +846,10 @@ g.train circle {
   line-height: 1.7em;
 }
 
+#main-part .mdl-radio__label.label {
+  line-height: 1.9em;
+}
+
 /* Article */
 
 article {

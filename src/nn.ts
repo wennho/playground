@@ -332,6 +332,11 @@ export class Link {
       this.weight = 0;
     }
   }
+
+  remove() {
+    this.source.removeOutput(this.dest.id);
+    this.dest.removeInput(this.source.id);
+  }
 }
 
 
