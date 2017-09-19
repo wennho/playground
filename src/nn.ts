@@ -168,7 +168,8 @@ export class Node {
 
   // Saved average error derivative
   error = 0;
-
+  accError = 0;
+  currError = 0;
   /**
    * Creates a new node with the provided id and activation function.
    */
@@ -310,6 +311,8 @@ export class Link {
   numAccumulatedDers = 0;
   regularization: RegularizationFunction;
   error = 0;
+  accError = 0;
+  currError = 0;
 
   /**
    * Constructs a link in the neural network initialized with random weight.
@@ -377,6 +380,8 @@ export function backProp(network: Node[][], target: number,
   // function for the derivative.
   let outputNode = network[network.length - 1][0];
   outputNode.outputDer = errorFunc.der(outputNode.output, target);
+  outputNode.currError = Math.abs(outputNode.output - target);
+  outputNode.accError += outputNode.currError;
 
   // Go through the layers backwards.
   for (let layerIdx = network.length - 1; layerIdx >= 1; layerIdx--) {
@@ -394,15 +399,26 @@ export function backProp(network: Node[][], target: number,
     // Error derivative with respect to each weight coming into the node.
     for (let i = 0; i < currentLayer.length; i++) {
       let node = currentLayer[i];
+
+      let weightSum = node.inputLinks.reduce(function (prev, curr) {
+        return prev + Math.abs(curr.weight);
+      }, 0);
+
       for (let j = 0; j < node.inputLinks.length; j++) {
         let link = node.inputLinks[j];
         if (link.isDead) {
+          link.currError = 0;
           continue;
         }
         link.errorDer = node.inputDer * link.source.output;
         link.accErrorDer += link.errorDer;
         link.numAccumulatedDers++;
+
+        link.currError = node.currError * Math.abs(link.weight) / weightSum;
+        link.accError += link.currError;
       }
+
+
     }
     if (layerIdx === 1) {
       continue;
@@ -412,10 +428,13 @@ export function backProp(network: Node[][], target: number,
       let node = prevLayer[i];
       // Compute the error derivative with respect to each node's output.
       node.outputDer = 0;
+      node.currError = 0;
       for (let j = 0; j < node.outputs.length; j++) {
         let output = node.outputs[j];
         node.outputDer += output.weight * output.dest.inputDer;
+        node.currError += output.currError;
       }
+      node.accError += node.currError;
     }
   }
 }
@@ -432,9 +451,10 @@ export function updateWeights(network: Node[][], learningRate: number,
       let node = currentLayer[i];
       // Update the node's bias.
       if (node.numAccumulatedDers > 0) {
-        node.error = node.accInputDer / node.numAccumulatedDers;
-        node.bias -= learningRate * node.error;
+        node.error = node.accError / node.numAccumulatedDers;
+        node.bias -= learningRate * node.accInputDer / node.numAccumulatedDers;
         node.accInputDer = 0;
+        node.accError = 0;
         node.numAccumulatedDers = 0;
       }
       // Update the weights coming into this node.
@@ -446,9 +466,9 @@ export function updateWeights(network: Node[][], learningRate: number,
         let regulDer = link.regularization ?
             link.regularization.der(link.weight) : 0;
         if (link.numAccumulatedDers > 0) {
-          link.error = link.accErrorDer / link.numAccumulatedDers;
+          link.error = link.accError / link.numAccumulatedDers;
           // Update the weight based on dE/dw.
-          link.weight = link.weight - learningRate * link.error;
+          link.weight = link.weight - learningRate * link.accErrorDer / link.numAccumulatedDers;
           // Further update the weight based on regularization.
           let newLinkWeight = link.weight -
               (learningRate * regularizationRate) * regulDer;
@@ -461,6 +481,7 @@ export function updateWeights(network: Node[][], learningRate: number,
             link.weight = newLinkWeight;
           }
           link.accErrorDer = 0;
+          link.accError = 0;
           link.numAccumulatedDers = 0;
         }
       }

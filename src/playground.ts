@@ -165,12 +165,12 @@ let linkErrorWidthScale = d3.scale.linear()
     .range([1, 10])
     .clamp(true);
 let colorScale = d3.scale.linear<string>()
-                     .domain([-10, 0, 10])
+                     .domain([-5, 0, 5])
                      .range(["#f59322", "#e8eaeb", "#0877bd"])
                      .clamp(true);
 let errorColorScale = d3.scale.linear<string>()
-                      .domain([-10, 0, 10])
-                      .range(["#505050", "#e8eaeb", "#505050"])
+                      .domain([0, 10])
+                      .range(["#e8eaeb", "#505050"])
                       .clamp(true);
 let iter = 0;
 let trainData: Example2D[] = [];
