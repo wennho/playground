@@ -200,14 +200,14 @@ limitations under the License.
           <span>Cursor Mode</span>
         </h4>
         <div>
-        <label class="ui-mode-none mdl-radio mdl-js-radio" style="align-items: center;">
-          <input type="radio" id="mode-none" name = "mode" class="mdl-radio__button" value="none" checked>
+        <label class="mdl-radio mdl-js-radio" style="align-items: center;">
+          <input type="radio" name = "mode" class="mdl-radio__button" value="none" checked>
           <span class="mdl-radio__label label">None</span>
         </label>
         </div>
         <div>
-        <label class="ui-mode-deleteEdge mdl-radio mdl-js-radio">
-          <input type="radio" id="mode-deleteEdge" name="mode" value="deleteEdge" class="mdl-radio__button">
+        <label class="mdl-radio mdl-js-radio">
+          <input type="radio" name="mode" class="mdl-radio__button" value="deleteEdge">
           <span class="mdl-radio__label label">Delete Edge</span>
         </label>
         </div>
@@ -228,7 +228,7 @@ limitations under the License.
         </svg>
         <!-- Hover card -->
         <div id="hovercard">
-          <div style="font-size:10px" id="hovercard-text">Click anywhere to edit.</div>
+          <div style="font-size:10px" id="hovercard-text">Click to edit.</div>
           <div><span class="type">Weight/Bias</span> is <span class="value">0.2</span><span><input type="number"/></span>.</div>
           <div>Error: <span class="error-value">0.2</span>.</div>
         </div>
@@ -323,6 +323,10 @@ limitations under the License.
             <input type="checkbox" id="discretize" class="mdl-checkbox__input" checked>
             <span class="mdl-checkbox__label label">Discretize output</span>
           </label>
+        </div>
+        <br />
+        <div>
+          Click on nodes to add an edge.
         </div>
       </div>
     </div>

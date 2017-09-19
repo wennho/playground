@@ -789,7 +789,7 @@ function updateHoverCard(type: HoverType, nodeOrLink?: nn.Node | nn.Link,
     input.on("input", function() {
       if (this.value != null && this.value !== "") {
         if (type === HoverType.WEIGHT) {
-          // (nodeOrLink as nn.Link).weight = +this.value;
+          (nodeOrLink as nn.Link).weight = +this.value;
         } else {
           (nodeOrLink as nn.Node).bias = +this.value;
         }
