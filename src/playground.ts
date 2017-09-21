@@ -400,13 +400,13 @@ function makeGUI() {
 }
 
 function updateNodeErrorUI(network: nn.Node[][]) {
-    nn.forEachNode(network, true, node => {
+    n.forEachNode(true, node => {
         d3.select(`text#error-${node.id}`).text('Error: ' + (node.error*100).toPrecision(3));
     });
 }
 
 function updateBiasesUI(network: nn.Node[][]) {
-  nn.forEachNode(network, true, node => {
+  n.forEachNode(true, node => {
     d3.select(`rect#bias-${node.id}`).style("fill", colorScale(node.bias));
   });
 }
@@ -447,7 +447,7 @@ function updateWeightsUI(network: nn.Node[][], container: d3.Selection<any>) {
 export function updateDecisionBoundary(network: nn.Node[][], firstTime: boolean) {
   if (firstTime) {
     boundary = {};
-    nn.forEachNode(network, true, node => {
+    n.forEachNode(true, node => {
       boundary[node.id] = new Array(DENSITY);
     });
     // Go through all predefined inputs.
@@ -461,7 +461,7 @@ export function updateDecisionBoundary(network: nn.Node[][], firstTime: boolean)
   let i = 0, j = 0;
   for (i = 0; i < DENSITY; i++) {
     if (firstTime) {
-      nn.forEachNode(network, true, node => {
+      n.forEachNode(true, node => {
         boundary[node.id][i] = new Array(DENSITY);
       });
       // Go through all predefined inputs.
@@ -475,7 +475,7 @@ export function updateDecisionBoundary(network: nn.Node[][], firstTime: boolean)
       let y = yScale(j);
       let input = constructInput(x, y);
       nn.forwardProp(network, input);
-      nn.forEachNode(network, true, node => {
+      n.forEachNode(true, node => {
         boundary[node.id][i][j] = node.output;
       });
       if (firstTime) {
@@ -509,7 +509,7 @@ export function updateUI(firstStep = false) {
   // Get the decision boundary of the network.
   updateDecisionBoundary(n.network, firstStep);
   let selectedId = selectedNodeId != null ?
-      selectedNodeId : nn.getOutputNode(n.network).id;
+      selectedNodeId : n.getOutputNode().id;
   heatMap.updateBackground(boundary[selectedId], state.discretize);
 
   // Update all decision boundaries.
@@ -575,20 +575,6 @@ function oneStep(): void {
   updateUI();
 }
 
-export function getOutputWeights(network: nn.Node[][]): number[] {
-  let weights: number[] = [];
-  for (let layerIdx = 0; layerIdx < network.length - 1; layerIdx++) {
-    let currentLayer = network[layerIdx];
-    for (let i = 0; i < currentLayer.length; i++) {
-      let node = currentLayer[i];
-      for (let j = 0; j < node.outputs.length; j++) {
-        let output = node.outputs[j];
-        weights.push(output.weight);
-      }
-    }
-  }
-  return weights;
-}
 
 export function reset(onStartup=false) {
 

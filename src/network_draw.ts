@@ -35,12 +35,6 @@ export function setNetwork(network:nn.Network) {
   n = network;
 }
 
-let linkErrorWidthScale = d3.scale.linear()
-  .domain([0, 5])
-  .range([1, 10])
-  .clamp(true);
-
-
 // Draw network
 export function drawNetwork(n: nn.Network): void {
   let network: nn.Node[][] = n.network;
@@ -87,16 +81,27 @@ export function drawNetwork(n: nn.Network): void {
     drawNode(cx, cy, nodeId, true, container);
   });
 
-  // Draw the intermediate layers.
+  // calculate intermediate node placements
   for (let layerIdx = 1; layerIdx < numLayers - 1; layerIdx++) {
     let numNodes = network[layerIdx].length;
     let cx = layerScale(layerIdx) + RECT_SIZE / 2;
     maxY = Math.max(maxY, nodeIndexScale(numNodes));
-    addPlusMinusControl(layerScale(layerIdx), layerIdx);
     for (let i = 0; i < numNodes; i++) {
       let node = network[layerIdx][i];
       let cy = nodeIndexScale(i) + RECT_SIZE / 2;
       node2coord[node.id] = {cx, cy};
+    }
+  }
+
+  // Draw the intermediate layers.
+  for (let layerIdx = 1; layerIdx < numLayers - 1; layerIdx++) {
+    let numNodes = network[layerIdx].length;
+
+    addPlusMinusControl(layerScale(layerIdx), layerIdx);
+    for (let i = 0; i < numNodes; i++) {
+      let node = network[layerIdx][i];
+      let cx = node2coord[node.id].cx;
+      let cy = node2coord[node.id].cy;
       drawNode(cx, cy, node.id, false, container, node);
 
       // Show callout to thumbnails.
@@ -112,8 +117,14 @@ export function drawNetwork(n: nn.Network): void {
         });
         idWithCallout = node.id;
       }
+    }
+  }
 
       // Draw links.
+  for (let layerIdx = 1; layerIdx < numLayers - 1; layerIdx++) {
+    let numNodes = network[layerIdx].length;
+    for (let i = 0; i < numNodes; i++) {
+      let node = network[layerIdx][i];
       for (let j = 0; j < node.inputLinks.length; j++) {
         let link = node.inputLinks[j];
 
@@ -237,7 +248,7 @@ function updateHoverCard(type: HoverType, nodeOrLink?: nn.Node | nn.Link,
   d3.select("#svg").on("click", () => {
 
     if (mode === Mode.DeleteEdge && nodeOrLink instanceof nn.Link) {
-      nodeOrLink.remove();
+      n.removeLink(nodeOrLink);
       let hovercard = d3.select("#hovercard");
       hovercard.style("display", "none");
       d3.select("#svg").on("click", null);
@@ -497,7 +508,7 @@ function drawNode(cx: number, cy: number, nodeId: string, isInput: boolean,
       div.classed("hovered", false);
       nodeGroup.classed("hovered", false);
       updateDecisionBoundary(n.network, false);
-      heatMap.updateBackground(boundary[nn.getOutputNode(n.network).id],
+      heatMap.updateBackground(boundary[n.getOutputNode().id],
         state.discretize);
     })
     .on("click", function(){

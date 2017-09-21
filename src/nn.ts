@@ -21,6 +21,7 @@ export class Network {
   activation: ActivationFunction;
   initZero:boolean;
   regularization:RegularizationFunction;
+  longLinks: Link[];
 
   /**
    * Builds a neural network.
@@ -86,27 +87,28 @@ export class Network {
 
 
   removeNode(node: Node) {
-      // Remove links
-      for (let i=0; i<node.inputLinks.length; i++) {
-          node.inputLinks[i].source.removeOutput(node.id);
-      }
-      for (let i=0; i<node.outputs.length; i++) {
-          node.outputs[i].dest.removeInput(node.id);
-      }
 
-      // remove node from network
-      let found = false;
-      for (let i=0; i<this.network.length; i++) {
-          let index = this.network[i].map(function(x) {return x.id; }).indexOf(node.id);
-          if (index > -1) {
-              this.network[i].splice(index, 1);
-              found = true;
-              break;
-          }
-      }
-      if (!found) {
-          throw new Error ("cannot find node to remove");
-      }
+    // Remove links
+    // use while loop because the link array is changing each iteration
+    while (node.inputLinks.length > 0) {
+      this.removeLink(node.inputLinks[0]);
+    }
+
+    while (node.outputs.length > 0) {
+      this.removeLink(node.outputs[0]);
+    }
+
+
+    // remove node from network
+
+    let i = node.layer;
+
+    let index = this.network[i].map(function(x) {return x.id; }).indexOf(node.id);
+    if (index > -1) {
+      this.network[i].splice(index, 1);
+    } else {
+      throw new Error ("cannot find node to remove");
+    }
   }
 
   findNode(nodeId: string) {
@@ -151,15 +153,56 @@ export class Network {
   }
 
   addLink(fromNode:Node, toNode:Node) {
-    // check link does not already exist
-    if (fromNode.isLinked(toNode)) {
-      throw new Error("Cannot create duplicate link");
-    }
 
     let link = new Link(fromNode, toNode, this.regularization, this.initZero);
     fromNode.outputs.push(link);
     toNode.inputLinks.push(link);
+    if (toNode.layer - fromNode.layer > 1) {
+      this.longLinks.push(link);
+    }
+
   }
+
+  removeLink(link:Link) {
+
+    if (link.dest.layer - link.source.layer > 1) {
+      this.longLinks = this.longLinks.filter(function(x) {return x.id !== link.id; });
+    }
+
+    let node = link.source;
+    let origLength = node.outputs.length;
+    node.outputs = node.outputs.filter(function(x) {return x.id !== link.id; });
+    if (node.outputs.length !== origLength - 1 ) {
+      throw new Error('Unable to remove output node - node not found');
+    }
+
+    node = link.dest;
+    origLength = node.inputLinks.length;
+    node.inputLinks = node.inputLinks.filter(function(x) {return x.id !== link.id });
+    if (node.inputLinks.length !== origLength -1 ) {
+      throw new Error('Unable to remove input node - node not found');
+    }
+  }
+
+  /** Iterates over every node in the network/ */
+  // ignoreInputs - ignore input layer
+  forEachNode(ignoreInputs: boolean, accessor: (node: Node) => any) {
+    for (let layerIdx = ignoreInputs ? 1 : 0;
+         layerIdx < this.network.length;
+         layerIdx++) {
+      let currentLayer = this.network[layerIdx];
+      for (let i = 0; i < currentLayer.length; i++) {
+        let node = currentLayer[i];
+        accessor(node);
+      }
+    }
+  }
+
+  /** Returns the output node in the network. */
+  getOutputNode() {
+    return this.network[this.network.length - 1][0];
+  }
+
 }
 
 /**
@@ -225,23 +268,6 @@ export class Node {
     return this.output;
   }
 
-  removeOutput(nodeId: string) {
-    let index = this.outputs.map(function(x) {return x.dest.id; }).indexOf(nodeId);
-    if (index > -1) {
-      this.outputs.splice(index, 1);
-    } else {
-      throw new Error('Unable to remove output node - node not found');
-    }
-  }
-
-  removeInput(nodeId: string) {
-      let index = this.inputLinks.map(function(x) {return x.source.id; }).indexOf(nodeId);
-      if (index > -1) {
-          this.inputLinks.splice(index, 1);
-      } else {
-          throw new Error('Unable to remove input node - node not found');
-      }
-  }
 
   isLinked(node: Node): boolean {
     let index = this.outputs.map(function(x) {return x.dest.id; }).indexOf(node.id);
@@ -368,6 +394,12 @@ export class Link {
    */
   constructor(source: Node, dest: Node,
       regularization: RegularizationFunction, initZero?: boolean) {
+
+    // check link does not already exist
+    if (source.isLinked(dest)) {
+      throw new Error("Cannot create duplicate link");
+    }
+
     this.id = source.id + "-" + dest.id;
     this.source = source;
     this.dest = dest;
@@ -377,10 +409,6 @@ export class Link {
     }
   }
 
-  remove() {
-    this.source.removeOutput(this.dest.id);
-    this.dest.removeInput(this.source.id);
-  }
 }
 
 
@@ -538,22 +566,3 @@ export function updateWeights(network: Node[][], learningRate: number,
   }
 }
 
-/** Iterates over every node in the network/ */
-// ignoreInputs - ignore input layer
-export function forEachNode(network: Node[][], ignoreInputs: boolean,
-    accessor: (node: Node) => any) {
-  for (let layerIdx = ignoreInputs ? 1 : 0;
-      layerIdx < network.length;
-      layerIdx++) {
-    let currentLayer = network[layerIdx];
-    for (let i = 0; i < currentLayer.length; i++) {
-      let node = currentLayer[i];
-      accessor(node);
-    }
-  }
-}
-
-/** Returns the output node in the network. */
-export function getOutputNode(network: Node[][]) {
-  return network[network.length - 1][0];
-}
