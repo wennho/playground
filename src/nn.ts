@@ -23,6 +23,7 @@ export class Network {
   regularization:RegularizationFunction;
   longLinks: Link[];
 
+
   /**
    * Builds a neural network.
    *
@@ -48,6 +49,8 @@ export class Network {
       this.initZero = initZero;
       this.activation = activation;
       this.regularization = regularization;
+      this.longLinks = [];
+
       for (let layerIdx = 0; layerIdx < numLayers; layerIdx++) {
           let isOutputLayer = layerIdx === numLayers - 1;
           let isInputLayer = layerIdx === 0;

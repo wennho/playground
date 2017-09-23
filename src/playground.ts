@@ -34,6 +34,7 @@ import {
   n,
   setNetwork,
   selectedNodeId,
+  NetworkUI,
 } from "./network_draw"
 
 let mainWidth;

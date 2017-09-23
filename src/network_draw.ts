@@ -5,8 +5,8 @@ import {HeatMap} from "./heatmap";
 const RECT_SIZE = 30;
 const BIAS_SIZE = 5;
 
-enum HoverType {
-  BIAS, WEIGHT
+enum ElementType {
+  NODE, LINK
 }
 
 export interface InputFeature {
@@ -35,6 +35,119 @@ export function setNetwork(network:nn.Network) {
   n = network;
 }
 
+
+class ElementUI {
+  id: string;
+  type:ElementType;
+  links: string[] = [];
+  cx :number;
+  cy : number;
+
+  constructor (id:string, type:ElementType) {
+    this.id = id;
+    this.type = type;
+  }
+};
+
+
+export class NetworkUI {
+
+  layout : ElementUI[][];
+  id2pos : {[id:string] : number} = {};
+  id2elem : {[id:string] : any} = {};
+  maxY : number;
+
+  updateMapping() {
+    this.layout.forEach( function (layer, layerIdx) {
+      layer.forEach(function (element, index) {
+        this.id2pos[element.id] = index;
+        if (element.type == ElementType.NODE) {
+          this.id2elem[element.id] = element;
+        } else {
+          element.links.forEach((linkId) => {
+            if (!this.id2elem.hasOwnProperty(linkId)){
+              this.id2elem[linkId] = {};
+            }
+            this.id2elem[linkId][layerIdx] = element;
+          }, this);
+        }
+      }, this);
+    }, this);
+  }
+
+  constructor (n: nn.Network, width:number) {
+
+    // Draw the network layer by layer.
+    let numLayers = n.network.length;
+    let featureWidth = 118;
+    let layerScale = d3.scale.ordinal<number, number>()
+      .domain(d3.range(1, numLayers - 1))
+      .rangePoints([featureWidth, width - RECT_SIZE], 0.7);
+    let nodeIndexScale = (nodeIndex: number) => nodeIndex * (RECT_SIZE + 25);
+
+
+    // create basic layout
+    this.layout = n.network.map((layer) => {
+      return layer.map((node) => {
+        let element = new ElementUI(node.id, ElementType.NODE);
+        return element;
+      });
+    });
+    this.updateMapping();
+
+    // insert long links
+    n.longLinks.forEach( function (link){
+      let sourcePos = this.id2pos[link.source.id];
+      let destPos = this.id2pos[link.dest.id];
+      let pos = Math.round((sourcePos + destPos)/2);
+      for (let i = link.source.layer+1; i < link.dest.layer; i++) {
+        let element = this.layout[i][pos];
+        if (element.type == ElementType.LINK) {
+          element.links.push(link.id);
+        } else {
+          let newElement = new ElementUI(null, ElementType.LINK);
+          newElement.links.push(link.id);
+          this.layout[i].splice(pos,0, newElement);
+        }
+      }
+    }, this);
+
+    this.updateMapping();
+
+    // calculate coords for intermediate layers
+    for (let layerIdx = 1; layerIdx < numLayers - 1; layerIdx++) {
+      let cx = layerScale(layerIdx) + RECT_SIZE / 2;
+      for (let i = 0; i < this.layout[layerIdx].length; i++) {
+        let element = this.layout[layerIdx][i];
+        element.cx = cx;
+        element.cy = nodeIndexScale(i) + RECT_SIZE / 2;
+      }
+    }
+
+    // calculate coords for input layers
+    let nodeIds = Object.keys(INPUTS);
+    let cx = RECT_SIZE / 2 + 50;
+    nodeIds.forEach((nodeId, i) => {
+      let cy = nodeIndexScale(i) + RECT_SIZE / 2;
+      if (!this.id2elem.hasOwnProperty(nodeId)) {
+        this.id2elem[nodeId] = new ElementUI(nodeId, ElementType.NODE);
+      }
+      this.id2elem[nodeId].cx = cx;
+      this.id2elem[nodeId].cy = cy;
+    }, this);
+
+    // calculate coords for output layer
+    let node = n.network[numLayers - 1][0];
+    this.id2elem[node.id].cx = width + RECT_SIZE / 2;
+    this.id2elem[node.id].cy = nodeIndexScale(0) + RECT_SIZE / 2;
+
+    this.maxY = Math.max(...(this.layout.map((layer) => nodeIndexScale(layer.length))));
+    this.maxY = Math.max(this.maxY, nodeIndexScale(nodeIds.length));
+  }
+}
+
+
+
 // Draw network
 export function drawNetwork(n: nn.Network): void {
   let network: nn.Node[][] = n.network;
@@ -52,8 +165,6 @@ export function drawNetwork(n: nn.Network): void {
   let width = co.offsetLeft - cf.offsetLeft;
   svg.attr("width", width);
 
-  // Map of all node coordinates.
-  let node2coord: {[id: string]: {cx: number, cy: number}} = {};
   let container = svg.append("g")
     .classed("core", true)
     .attr("transform", `translate(${padding},${padding})`);
@@ -63,60 +174,27 @@ export function drawNetwork(n: nn.Network): void {
   let layerScale = d3.scale.ordinal<number, number>()
     .domain(d3.range(1, numLayers - 1))
     .rangePoints([featureWidth, width - RECT_SIZE], 0.7);
-  let nodeIndexScale = (nodeIndex: number) => nodeIndex * (RECT_SIZE + 25);
 
 
   let calloutThumb = d3.select(".callout.thumbnail").style("display", "none");
   let calloutWeights = d3.select(".callout.weights").style("display", "none");
   let idWithCallout = null;
   let targetIdWithCallout = null;
+  let netUI = new NetworkUI(n,width);
 
   // Draw the input layer separately.
-  let cx = RECT_SIZE / 2 + 50;
   let nodeIds = Object.keys(INPUTS);
-  let maxY = nodeIndexScale(nodeIds.length);
   nodeIds.forEach((nodeId, i) => {
-    let cy = nodeIndexScale(i) + RECT_SIZE / 2;
-    node2coord[nodeId] = {cx, cy};
-    drawNode(cx, cy, nodeId, true, container);
+    drawNode(netUI, nodeId, true, container);
   });
-
-  // calculate intermediate node placements
-  for (let layerIdx = 1; layerIdx < numLayers - 1; layerIdx++) {
-    let numNodes = network[layerIdx].length;
-    let cx = layerScale(layerIdx) + RECT_SIZE / 2;
-    maxY = Math.max(maxY, nodeIndexScale(numNodes));
-    for (let i = 0; i < numNodes; i++) {
-      let node = network[layerIdx][i];
-      let cy = nodeIndexScale(i) + RECT_SIZE / 2;
-      node2coord[node.id] = {cx, cy};
-    }
-  }
 
   // Draw the intermediate layers.
   for (let layerIdx = 1; layerIdx < numLayers - 1; layerIdx++) {
     let numNodes = network[layerIdx].length;
-
     addPlusMinusControl(layerScale(layerIdx), layerIdx);
     for (let i = 0; i < numNodes; i++) {
-      let node = network[layerIdx][i];
-      let cx = node2coord[node.id].cx;
-      let cy = node2coord[node.id].cy;
-      drawNode(cx, cy, node.id, false, container, node);
-
-      // Show callout to thumbnails.
-      let numNodes = network[layerIdx].length;
-      let nextNumNodes = network[layerIdx + 1].length;
-      if (idWithCallout == null &&
-        i === numNodes - 1 &&
-        nextNumNodes <= numNodes) {
-        calloutThumb.style({
-          display: null,
-          top: `${20 + 3 + 13 + cy}px`,
-          left: `${cx}px`
-        });
-        idWithCallout = node.id;
-      }
+      let node = network[layerIdx][i]
+      drawNode(netUI, node.id, false, container, node);
     }
   }
 
@@ -128,8 +206,8 @@ export function drawNetwork(n: nn.Network): void {
       for (let j = 0; j < node.inputLinks.length; j++) {
         let link = node.inputLinks[j];
 
-        let path: SVGPathElement = drawLink(link, node2coord, n.network,
-          container, j === 0, j, node.inputLinks.length).node() as any;
+        let path: SVGPathElement = drawLink(link, netUI,
+          container).node() as any;
         // Show callout to weights.
         let prevLayer = network[layerIdx - 1];
         let lastNodePrevLayer = prevLayer[prevLayer.length - 1];
@@ -155,9 +233,7 @@ export function drawNetwork(n: nn.Network): void {
   }
 
   // Output node is drawn separately
-  cx = width + RECT_SIZE / 2;
   let node = network[numLayers - 1][0];
-
   // add click listener
   d3.select('#heatmap').on('click', function(){
     if (mode == Mode.AddEdge) {
@@ -165,16 +241,15 @@ export function drawNetwork(n: nn.Network): void {
     }
   });
 
-  let cy = nodeIndexScale(0) + RECT_SIZE / 2;
-  node2coord[node.id] = {cx, cy};
+
   // Draw links.
   for (let i = 0; i < node.inputLinks.length; i++) {
     let link = node.inputLinks[i];
-    drawLink(link, node2coord, n.network, container, i === 0, i,
-      node.inputLinks.length);
+    drawLink(link, netUI, container);
   }
+
   // Adjust the height of the svg.
-  svg.attr("height", maxY);
+  svg.attr("height", netUI.maxY);
 
   // Adjust the height of the features column.
   let height = Math.max(
@@ -235,7 +310,7 @@ function addPlusMinusControl(x: number, layerIdx: number) {
   );
 }
 
-function updateHoverCard(type: HoverType, nodeOrLink?: nn.Node | nn.Link,
+function updateHoverCard(type: ElementType, nodeOrLink?: nn.Node | nn.Link,
                          coordinates?: [number, number]) {
   let hovercard = d3.select("#hovercard");
   if (type == null) {
@@ -261,7 +336,7 @@ function updateHoverCard(type: HoverType, nodeOrLink?: nn.Node | nn.Link,
     input.style("display", null);
     input.on("input", function() {
       if (this.value != null && this.value !== "") {
-        if (type === HoverType.WEIGHT) {
+        if (type === ElementType.LINK) {
           (nodeOrLink as nn.Link).weight = +this.value;
         } else {
           (nodeOrLink as nn.Node).bias = +this.value;
@@ -276,13 +351,13 @@ function updateHoverCard(type: HoverType, nodeOrLink?: nn.Node | nn.Link,
     });
     (input.node() as HTMLInputElement).focus();
   });
-  let value = (type === HoverType.WEIGHT) ?
+  let value = (type === ElementType.LINK) ?
     (nodeOrLink as nn.Link).weight :
     (nodeOrLink as nn.Node).bias;
-  let error = (type === HoverType.WEIGHT) ?
+  let error = (type === ElementType.LINK) ?
     (nodeOrLink as nn.Link).error :
     (nodeOrLink as nn.Node).error;
-  let name = (type === HoverType.WEIGHT) ? "Weight" : "Bias";
+  let name = (type === ElementType.LINK) ? "Weight" : "Bias";
   hovercard.style({
     "left": `${coordinates[0] + 20}px`,
     "top": `${coordinates[1]}px`,
@@ -301,47 +376,90 @@ function updateHoverCard(type: HoverType, nodeOrLink?: nn.Node | nn.Link,
 }
 
 function drawLink(
-  input: nn.Link, node2coord: {[id: string]: {cx: number, cy: number}},
-  network: nn.Node[][], container: d3.Selection<any>,
-  isFirst: boolean, index: number, length: number) {
+  link: nn.Link, netUI: NetworkUI,
+  container: d3.Selection<any>) {
   let line = container.insert("path", ":first-child");
-  let source = node2coord[input.source.id];
-  let dest = node2coord[input.dest.id];
-  let datum = {
-    source: {
-      y: source.cx + RECT_SIZE / 2 + 2,
-      x: source.cy
-    },
-    target: {
-      y: dest.cx - RECT_SIZE / 2,
-      x: dest.cy + ((index - (length - 1) / 2) / length) * 12
+  let source = netUI.id2elem[link.source.id];
+  let dest = netUI.id2elem[link.dest.id];
+  let offset = RECT_SIZE * 1.2;
+  let dPath = null;
+
+  let length = link.dest.inputLinks.length;
+  let indexBeforeDest = link.dest.inputLinks.map((l)=>l.id).indexOf(link.id);
+
+  if (link.dest.layer - link.source.layer  <= 1) {
+
+    let datum = {
+      source: {
+        y: source.cx + RECT_SIZE / 2 + 2,
+        x: source.cy
+      },
+      target: {
+        y: dest.cx - RECT_SIZE / 2,
+        x: dest.cy + ((indexBeforeDest - (length - 1) / 2) / length) * 12
+      }
+    };
+    let diagonal = d3.svg.diagonal().projection(d => [d.y, d.x]);
+    dPath = diagonal(datum,0);
+
+  } else {
+
+    let lineData : [number,number][] = [
+      [source.cx + RECT_SIZE / 2 + 2, source.cy],
+      [source.cx + RECT_SIZE / 2 + 2 + offset, source.cy]
+    ];
+
+    for (let i = link.source.layer+1; i < link.dest.layer; i++) {
+      let linkEle = netUI.id2elem[link.id][i];
+      let cy = linkEle.cy;
+      let cx = linkEle.cx;
+      lineData.push([cx - offset, cy]);
+      lineData.push([cx + offset, cy]);
     }
-  };
-  let diagonal = d3.svg.diagonal().projection(d => [d.y, d.x]);
+
+    lineData.push([
+      dest.cx - RECT_SIZE / 2 - offset,
+      dest.cy + ((indexBeforeDest - (length - 1) / 2) / length) * 12
+    ]);
+
+    lineData.push([
+      dest.cx - RECT_SIZE / 2,
+      dest.cy + ((indexBeforeDest - (length - 1) / 2) / length) * 12
+    ]);
+
+
+    var lineFunction = d3.svg.line()
+      .x(function(d) { return d[0]; })
+      .y(function(d) { return d[1]; })
+      .interpolate("basis");
+
+    dPath = lineFunction(lineData);
+
+  }
 
   // back-most line to show error rate
   line.attr({
-    "d" : diagonal(datum, 0),
+    "d" : dPath,
     class: "errorlink",
-    id: "errorline" + input.source.id + "-" + input.dest.id,
+    id: "errorline" + link.source.id + "-" + link.dest.id,
   });
 
   // line to show weights
   container.append("path").attr({
     "marker-start": "url(#markerArrow)",
     class: "link",
-    id: "link" + input.source.id + "-" + input.dest.id,
-    d: diagonal(datum, 0)
+    id: "link" + link.source.id + "-" + link.dest.id,
+    d: dPath
   });
 
 
   // Add an invisible thick link that will be used for showing the weight value on hover.
   // This has to be last so that it's on top.
   container.append("path")
-    .attr("d", diagonal(datum, 0))
+    .attr("d", dPath)
     .attr("class", "link-hover")
     .on("mouseenter", function() {
-      updateHoverCard(HoverType.WEIGHT, input, d3.mouse(this));
+      updateHoverCard(ElementType.LINK, link, d3.mouse(this));
     }).on("mouseleave", function() {
     updateHoverCard(null);
   });
@@ -383,10 +501,11 @@ function selectNode(div, node) {
 }
 
 
-function drawNode(cx: number, cy: number, nodeId: string, isInput: boolean,
+function drawNode(netUI:NetworkUI, nodeId: string, isInput: boolean,
                   container: d3.Selection<any>, node?: nn.Node) {
-  let x = cx - RECT_SIZE / 2;
-  let y = cy - RECT_SIZE / 2;
+  let element = netUI.id2elem[nodeId];
+  let x = element.cx - RECT_SIZE / 2;
+  let y = element.cy - RECT_SIZE / 2;
 
   let nodeGroup = container.append("g")
     .attr({
@@ -479,7 +598,7 @@ function drawNode(cx: number, cy: number, nodeId: string, isInput: boolean,
         width: BIAS_SIZE,
         height: BIAS_SIZE,
       }).on("mouseenter", function() {
-      updateHoverCard(HoverType.BIAS, node, d3.mouse(container.node()));
+      updateHoverCard(ElementType.NODE, node, d3.mouse(container.node()));
     }).on("mouseleave", function() {
       updateHoverCard(null);
     });
