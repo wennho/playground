@@ -122,9 +122,7 @@ export class Network {
         return this.network[i][index];
       }
     }
-
-    throw new Error ("cannot find node to remove");
-
+    throw new Error ("cannot find node");
   }
 
   // layer 0 corresponds to the input layer
@@ -162,6 +160,7 @@ export class Network {
     toNode.inputLinks.push(link);
     if (toNode.layer - fromNode.layer > 1) {
       this.longLinks.push(link);
+      link.isLong = true;
     }
 
   }
@@ -371,6 +370,8 @@ export class RegularizationFunction {
  * a run of back propagation.
  */
 export class Link {
+
+  static id2Link:{[id:string]:Link} = {};
   id: string;
   source: Node;
   dest: Node;
@@ -386,6 +387,7 @@ export class Link {
   error = 0;
   accError = 0;
   currError = 0;
+  isLong = false;
 
   /**
    * Constructs a link in the neural network initialized with random weight.
@@ -410,6 +412,7 @@ export class Link {
     if (initZero) {
       this.weight = 0;
     }
+    Link.id2Link[this.id] = this;
   }
 
 }

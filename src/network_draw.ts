@@ -43,9 +43,10 @@ class ElementUI {
   cx :number;
   cy : number;
 
-  constructor (id:string, type:ElementType) {
+  constructor (id:string, type:ElementType, links:string[]) {
     this.id = id;
     this.type = type;
+    this.links = links;
   }
 };
 
@@ -53,26 +54,81 @@ class ElementUI {
 export class NetworkUI {
 
   layout : ElementUI[][];
-  id2pos : {[id:string] : number} = {};
+  nodeId2layer :{[id:string] : number} = {};
+  id2pos : {[id:string] : any} = {};
   id2elem : {[id:string] : any} = {};
   maxY : number;
 
   updateMapping() {
     this.layout.forEach( function (layer, layerIdx) {
       layer.forEach(function (element, index) {
-        this.id2pos[element.id] = index;
+        this.nodeId2layer[element.id] = layerIdx;
         if (element.type == ElementType.NODE) {
           this.id2elem[element.id] = element;
+          this.id2pos[element.id] = index;
         } else {
           element.links.forEach((linkId) => {
+
             if (!this.id2elem.hasOwnProperty(linkId)){
               this.id2elem[linkId] = {};
             }
             this.id2elem[linkId][layerIdx] = element;
+
+            if (!this.id2pos.hasOwnProperty(linkId)){
+              this.id2pos[linkId] = {};
+            }
+            this.id2pos[linkId][layerIdx] = index;
+
           }, this);
         }
       }, this);
     }, this);
+  }
+
+
+  getPosInLayer(link: nn.Link, layer:number) {
+
+    if (this.nodeId2layer[link.source.id] == layer) {
+      return this.id2pos[link.source.id];
+    } else if (this.nodeId2layer[link.dest.id] == layer) {
+      return this.id2pos[link.dest.id];
+    }
+
+    return this.id2pos[link.id][layer];
+  }
+
+  // recursive function to determine link ordering
+  compareOrder(a, b, layer) {
+
+    if (layer < 0 && a.dest.id != b.dest.id) {
+      let compLayer = Math.min(this.nodeId2layer[a.dest.id], this.nodeId2layer[b.dest.id]);
+      return this.compareOrder(a,b,compLayer);
+    }
+
+    if (layer < 0) throw new Error('recursion failed');
+
+    let posA = this.getPosInLayer(a,layer);
+    let posB = this.getPosInLayer(b,layer);
+
+    if (posA != posB) return posA - posB;
+    else return this.compareOrder(a,b,layer-1);
+
+  }
+
+  updateOrdering(){
+    for (let i=1; i<this.layout.length; i++) {
+
+      this.layout[i].forEach(function (element, index) {
+        element.links.sort((a,b)=>{
+
+          let linkA = nn.Link.id2Link[a];
+          let linkB = nn.Link.id2Link[b];
+
+          return this.compareOrder(linkA, linkB, i-1);
+
+        });
+      }, this);
+    }
   }
 
   constructor (n: nn.Network, width:number) {
@@ -87,32 +143,69 @@ export class NetworkUI {
 
 
     // create basic layout
-    this.layout = n.network.map((layer) => {
+    this.layout = n.network.map((layer, layerIdx) => {
+
+      // do input layer separately
+      if (layerIdx == 0 ) {
+        return Object.keys(INPUTS).map((nodeId) => {
+          return new ElementUI(nodeId, ElementType.NODE, []);
+        });
+      }
+
       return layer.map((node) => {
-        let element = new ElementUI(node.id, ElementType.NODE);
-        return element;
+        let links = node.inputLinks.map((l)=>l.id);
+        return new ElementUI(node.id, ElementType.NODE, links);
       });
     });
     this.updateMapping();
 
     // insert long links
-    n.longLinks.forEach( function (link){
+    let posToAdd : any[] = this.layout.map(()=>{ return {}; });
+    for (let j=0; j<n.longLinks.length; j++){
+      let link = n.longLinks[j];
       let sourcePos = this.id2pos[link.source.id];
       let destPos = this.id2pos[link.dest.id];
       let pos = Math.round((sourcePos + destPos)/2);
       for (let i = link.source.layer+1; i < link.dest.layer; i++) {
-        let element = this.layout[i][pos];
-        if (element.type == ElementType.LINK) {
-          element.links.push(link.id);
-        } else {
-          let newElement = new ElementUI(null, ElementType.LINK);
-          newElement.links.push(link.id);
-          this.layout[i].splice(pos,0, newElement);
+        if (!posToAdd[i].hasOwnProperty(pos)) {
+          posToAdd[i][pos] = [];
         }
+        posToAdd[i][pos].push(link);
       }
+    }
+
+    // : {[pos:number] : nn.Link[]}
+    posToAdd.forEach(function (v , layerIdx) {
+
+      if (Object.keys(v).length == 0) return;
+
+      let posList = Object.keys(v).sort();
+
+      posList.forEach((pos) => {
+
+        // pos is above all others. just push to end of layer
+        if (this.layout[layerIdx].hasOwnProperty(pos)) {
+          let newElement = new ElementUI(null, ElementType.LINK, []);
+          this.layout[layerIdx].push(newElement);
+        }
+
+        v[pos].forEach((link) => {
+
+          let element = this.layout[layerIdx][pos];
+          if (element.type == ElementType.LINK) {
+            element.links.push(link.id);
+          } else {
+            let newElement = new ElementUI(null, ElementType.LINK,[link.id]);
+            this.layout[layerIdx].splice(pos,0, newElement);
+          }
+        }, this);
+      }, this);
+
+
     }, this);
 
     this.updateMapping();
+    this.updateOrdering();
 
     // calculate coords for intermediate layers
     for (let layerIdx = 1; layerIdx < numLayers - 1; layerIdx++) {
@@ -130,7 +223,7 @@ export class NetworkUI {
     nodeIds.forEach((nodeId, i) => {
       let cy = nodeIndexScale(i) + RECT_SIZE / 2;
       if (!this.id2elem.hasOwnProperty(nodeId)) {
-        this.id2elem[nodeId] = new ElementUI(nodeId, ElementType.NODE);
+        this.id2elem[nodeId] = new ElementUI(nodeId, ElementType.NODE,[]);
       }
       this.id2elem[nodeId].cx = cx;
       this.id2elem[nodeId].cy = cy;
@@ -198,7 +291,7 @@ export function drawNetwork(n: nn.Network): void {
     }
   }
 
-      // Draw links.
+  // Draw links.
   for (let layerIdx = 1; layerIdx < numLayers - 1; layerIdx++) {
     let numNodes = network[layerIdx].length;
     for (let i = 0; i < numNodes; i++) {
@@ -375,6 +468,10 @@ function updateHoverCard(type: ElementType, nodeOrLink?: nn.Node | nn.Link,
     .style("display", "none");
 }
 
+function calculateOffset(index, length) {
+  return ((index - (length - 1) / 2) / length) * 12;
+}
+
 function drawLink(
   link: nn.Link, netUI: NetworkUI,
   container: d3.Selection<any>) {
@@ -384,10 +481,11 @@ function drawLink(
   let offset = RECT_SIZE * 1.2;
   let dPath = null;
 
-  let length = link.dest.inputLinks.length;
-  let indexBeforeDest = link.dest.inputLinks.map((l)=>l.id).indexOf(link.id);
+  let destInputLinks = netUI.id2elem[link.dest.id].links;
+  let indexBeforeDest = destInputLinks.indexOf(link.id);
+  let destOffset = calculateOffset(indexBeforeDest, destInputLinks.length);
 
-  if (link.dest.layer - link.source.layer  <= 1) {
+  if (!link.isLong) {
 
     let datum = {
       source: {
@@ -396,7 +494,7 @@ function drawLink(
       },
       target: {
         y: dest.cx - RECT_SIZE / 2,
-        x: dest.cy + ((indexBeforeDest - (length - 1) / 2) / length) * 12
+        x: dest.cy + destOffset
       }
     };
     let diagonal = d3.svg.diagonal().projection(d => [d.y, d.x]);
@@ -404,27 +502,33 @@ function drawLink(
 
   } else {
 
+    // draw the start
     let lineData : [number,number][] = [
       [source.cx + RECT_SIZE / 2 + 2, source.cy],
       [source.cx + RECT_SIZE / 2 + 2 + offset, source.cy]
     ];
 
+    // draw the middle
     for (let i = link.source.layer+1; i < link.dest.layer; i++) {
       let linkEle = netUI.id2elem[link.id][i];
+
+      let intermediateOffset = calculateOffset(linkEle.links.indexOf(link.id),linkEle.links.length);
+
       let cy = linkEle.cy;
       let cx = linkEle.cx;
-      lineData.push([cx - offset, cy]);
-      lineData.push([cx + offset, cy]);
+      lineData.push([cx - offset, cy + intermediateOffset]);
+      lineData.push([cx + offset, cy + intermediateOffset]);
     }
 
+    // draw the end
     lineData.push([
       dest.cx - RECT_SIZE / 2 - offset,
-      dest.cy + ((indexBeforeDest - (length - 1) / 2) / length) * 12
+      dest.cy + destOffset
     ]);
 
     lineData.push([
       dest.cx - RECT_SIZE / 2,
-      dest.cy + ((indexBeforeDest - (length - 1) / 2) / length) * 12
+      dest.cy + destOffset
     ]);
 
 
