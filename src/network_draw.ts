@@ -305,22 +305,6 @@ export function drawNetwork(n: nn.Network): void {
         let prevLayer = network[layerIdx - 1];
         let lastNodePrevLayer = prevLayer[prevLayer.length - 1];
 
-
-        // draw callout box
-        if (targetIdWithCallout == null &&
-          i === numNodes - 1 &&
-          link.source.id === lastNodePrevLayer.id &&
-          (link.source.id !== idWithCallout || numLayers <= 5) &&
-          link.dest.id !== idWithCallout &&
-          prevLayer.length >= numNodes) {
-          let midPoint = path.getPointAtLength(path.getTotalLength() * 0.7);
-          calloutWeights.style({
-            display: null,
-            top: `${midPoint.y + 5}px`,
-            left: `${midPoint.x + 3}px`
-          });
-          targetIdWithCallout = link.dest.id;
-        }
       }
     }
   }
