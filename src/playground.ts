@@ -237,14 +237,6 @@ function makeGUI() {
     reset();
   });
 
-  d3.select("#remove-layers").on("click", () => {
-    if (state.numHiddenLayers <= 0) {
-      return;
-    }
-    state.numHiddenLayers--;
-    state.networkShape.splice(state.numHiddenLayers);
-  });
-
   let showTestData = d3.select("#show-test-data").on("change", function() {
     state.showTestData = this.checked;
     state.serialize();
@@ -559,10 +551,6 @@ export function reset(onStartup=false) {
   }
   player.pause();
 
-  let suffix = state.numHiddenLayers !== 1 ? "s" : "";
-  d3.select("#layers-label").text("Hidden layer" + suffix);
-  d3.select("#num-layers").text(state.numHiddenLayers);
-
   if (onStartup) {
       // Make a simple network.
       iter = 0;
@@ -573,6 +561,11 @@ export function reset(onStartup=false) {
       setNetwork(new nn.Network(shape, state.activation, outputActivation,
           state.regularization, constructInputIds(), state.initZero));
   }
+
+  let numHiddenLayers = n.network.length - 2;
+  let suffix = numHiddenLayers !== 1 ? "s" : "";
+  d3.select("#layers-label").text("Hidden layer" + suffix);
+  d3.select("#num-layers").text(numHiddenLayers);
 
   lossTrain = getLoss(n.network, trainData);
   lossTest = getLoss(n.network, testData);

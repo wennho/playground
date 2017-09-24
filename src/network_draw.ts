@@ -174,23 +174,20 @@ export class NetworkUI {
       }
     }
 
-    // : {[pos:number] : nn.Link[]}
     posToAdd.forEach(function (v , layerIdx) {
 
       if (Object.keys(v).length == 0) return;
 
       let posList = Object.keys(v).sort();
 
-      posList.forEach((pos) => {
-
-        // pos is above all others. just push to end of layer
-        if (this.layout[layerIdx].hasOwnProperty(pos)) {
-          let newElement = new ElementUI(null, ElementType.LINK, []);
-          this.layout[layerIdx].push(newElement);
+      posList.forEach((pos : string) => {
+        // pos is above all others. add elements until we reach the right pos
+        while  (!this.layout[layerIdx].hasOwnProperty(pos)) {
+            let newElement = new ElementUI(null, ElementType.LINK, []);
+            this.layout[layerIdx].push(newElement);
         }
 
         v[pos].forEach((link) => {
-
           let element = this.layout[layerIdx][pos];
           if (element.type == ElementType.LINK) {
             element.links.push(link.id);
@@ -282,7 +279,7 @@ export function drawNetwork(n: nn.Network): void {
   // Draw the intermediate layers.
   for (let layerIdx = 1; layerIdx < numLayers - 1; layerIdx++) {
     let numNodes = network[layerIdx].length;
-    addPlusMinusControl(layerScale(layerIdx), layerIdx);
+    addPlusMinusControl(layerScale(layerIdx), layerIdx, netUI);
     for (let i = 0; i < numNodes; i++) {
       let node = network[layerIdx][i]
       drawNode(netUI, node.id, false, container, node);
@@ -344,20 +341,17 @@ export function drawNetwork(n: nn.Network): void {
   d3.select(".column.features").style("height", height + "px");
 }
 
-
-
 function getRelativeHeight(selection: d3.Selection<any>) {
   let node = selection.node() as HTMLAnchorElement;
   return node.offsetHeight + node.offsetTop;
 }
 
-function addPlusMinusControl(x: number, layerIdx: number) {
+function addPlusMinusControl(x: number, layerIdx: number, netUI:NetworkUI) {
   let div = d3.select("#network").append("div")
     .classed("plus-minus-neurons", true)
     .style("left", `${x - 10}px`);
 
-  let i = layerIdx - 1;
-
+  let numNeurons = netUI.layout[layerIdx].length;
   div.append("button")
     .attr("class", "mdl-button mdl-js-button mdl-button--icon")
     .style({
@@ -380,11 +374,10 @@ function addPlusMinusControl(x: number, layerIdx: number) {
   firstRow.append("button")
     .attr("class", "mdl-button mdl-js-button mdl-button--icon")
     .on("click", () => {
-      let numNeurons = state.networkShape[i];
       if (numNeurons >= 8) {
         return;
       }
-      n.addNode(i+1);
+      n.addNode(layerIdx);
       reset();
     })
     .append("i")
@@ -394,20 +387,20 @@ function addPlusMinusControl(x: number, layerIdx: number) {
   firstRow.append("button")
     .attr("class", "mdl-button mdl-js-button mdl-button--icon")
     .on("click", () => {
-      let numNeurons = state.networkShape[i];
+      let numNeurons = netUI.layout[layerIdx].length;
       if (numNeurons <= 1) {
         return;
       }
-      n.removeNode(n.network[i+1][0]); // remove the first node
+      n.removeNode(n.network[layerIdx][0]); // remove the first node
       reset();
     })
     .append("i")
     .attr("class", "material-icons")
     .text("remove");
 
-  let suffix = state.networkShape[i] > 1 ? "s" : "";
+  let suffix = numNeurons > 1 ? "s" : "";
   div.append("div").text(
-    state.networkShape[i] + " neuron" + suffix
+    numNeurons + " neuron" + suffix
   );
 }
 
