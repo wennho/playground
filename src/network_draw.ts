@@ -1,5 +1,5 @@
 import * as nn from "./nn";
-import {mode, reset, state, updateUI, DENSITY, xDomain, paramChanged, updateDecisionBoundary, heatMap, boundary} from "./playground"
+import {mode, reset, state, updateUI, DENSITY, xDomain, updateDecisionBoundary, heatMap, boundary} from "./playground"
 import {HeatMap} from "./heatmap";
 
 const RECT_SIZE = 30;
@@ -166,7 +166,7 @@ export class NetworkUI {
       let sourcePos = this.id2pos[link.source.id];
       let destPos = this.id2pos[link.dest.id];
       let pos = Math.round((sourcePos + destPos)/2);
-      for (let i = link.source.layer+1; i < link.dest.layer; i++) {
+      for (let i = link.sourceLayer()+1; i < link.destLayer(); i++) {
         if (!posToAdd[i].hasOwnProperty(pos)) {
           posToAdd[i][pos] = [];
         }
@@ -368,7 +368,8 @@ function addPlusMinusControl(x: number, layerIdx: number) {
       "margin-left":"auto",
     })
     .on("click", () => {
-
+      n.removeLayer(layerIdx);
+      reset();
     })
     .append("i")
     .attr("class", "material-icons")
@@ -383,7 +384,6 @@ function addPlusMinusControl(x: number, layerIdx: number) {
         return;
       }
       n.addNode(i+1);
-      paramChanged();
       reset();
     })
     .append("i")
@@ -398,7 +398,6 @@ function addPlusMinusControl(x: number, layerIdx: number) {
         return;
       }
       n.removeNode(n.network[i+1][0]); // remove the first node
-      paramChanged();
       reset();
     })
     .append("i")
@@ -517,7 +516,7 @@ function drawLink(
     ];
 
     // draw the middle
-    for (let i = link.source.layer+1; i < link.dest.layer; i++) {
+    for (let i = link.sourceLayer()+1; i < link.destLayer(); i++) {
       let linkEle = netUI.id2elem[link.id][i];
 
       let intermediateOffset = calculateOffset(linkEle.links.indexOf(link.id),linkEle.links.length);
@@ -583,7 +582,7 @@ let selectedNode : nn.Node = null;
 let selectedDiv = null;
 export let selectedNodeId: string = null;
 
-function selectNode(div, node) {
+function selectNode(div, node : nn.Node) {
   if (selectedNode == null) {
     selectedNode = node;
     selectedDiv = div;
@@ -596,13 +595,15 @@ function selectNode(div, node) {
     d3.select('#info').text('Node ' + node.id + ' unselected.');
   } else {
     // first check that link does not already exist
-    if (selectedNode.layer == node.layer || selectedNode.isLinked(node)) {
+    let selectedNodeLayer = n.node2layer[selectedNode.id];
+    let nodeLayer = n.node2layer[node.id];
+    if (selectedNodeLayer == nodeLayer || selectedNode.isLinked(node)) {
       d3.select('#info').text('Cannot create link. Invalid target.');
       return;
     }
 
-    let fromNode = selectedNode.layer < node.layer ? selectedNode : node;
-    let toNode = selectedNode.layer > node.layer ? selectedNode : node;
+    let fromNode = selectedNodeLayer < nodeLayer ? selectedNode : node;
+    let toNode = selectedNodeLayer > nodeLayer ? selectedNode : node;
     n.addLink(fromNode, toNode);
     d3.select('#info').text('Link between nodes ' + node.id + ' and ' + selectedNode.id + ' created.');
     selectedNode = null;
@@ -683,7 +684,6 @@ function drawNode(netUI:NetworkUI, nodeId: string, isInput: boolean,
     text.append("tspan").text('Remove');
     text.on("click", function() {
       n.removeNode(node);
-      paramChanged();
       reset();
     });
     text.style("cursor", "pointer");
@@ -758,8 +758,6 @@ function drawNode(netUI:NetworkUI, nodeId: string, isInput: boolean,
 
       // add or remove input node
       state[nodeId] = !state[nodeId];
-      paramChanged();
-
       if (state[nodeId]) {
         n.addInput(nodeId);
       } else {

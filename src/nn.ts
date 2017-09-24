@@ -22,7 +22,7 @@ export class Network {
   initZero:boolean;
   regularization:RegularizationFunction;
   longLinks: Link[];
-
+  node2layer: {[id:string]:number} = {};
 
   /**
    * Builds a neural network.
@@ -65,13 +65,14 @@ export class Network {
                   this.nextNodeId++;
               }
               let node = new Node(nodeId,
-                  isOutputLayer ? outputActivation : activation, layerIdx,initZero);
+                  isOutputLayer ? outputActivation : activation, initZero);
               currentLayer.push(node);
+              this.node2layer[nodeId] = layerIdx;
               if (layerIdx >= 1) {
                   // Add links from nodes in the previous layer to this node.
                   for (let j = 0; j < this.network [layerIdx - 1].length; j++) {
                       let prevNode = this.network [layerIdx - 1][j];
-                      let link = new Link(prevNode, node, regularization, initZero);
+                      let link = new Link(prevNode, node, regularization, this);
                       prevNode.outputs.push(link);
                       node.inputLinks.push(link);
                   }
@@ -88,6 +89,18 @@ export class Network {
     return shape;
   }
 
+  removeLayer(layerIdx:number){
+    if (layerIdx < 1 || layerIdx >= this.network.length-1) {
+      throw new Error ("Cannot remove layer - index out of bounds");
+    }
+
+    while (this.network[layerIdx].length > 0){
+        this.removeNode(this.network[layerIdx][0]);
+    }
+
+    this.network.splice(layerIdx,1);
+    this.recomputeLayers();
+  }
 
   removeNode(node: Node) {
 
@@ -103,12 +116,10 @@ export class Network {
 
 
     // remove node from network
-
-    let i = node.layer;
-
-    let index = this.network[i].map(function(x) {return x.id; }).indexOf(node.id);
+    let layerIdx = this.node2layer[node.id];
+    let index = this.network[layerIdx].map(function(x) {return x.id; }).indexOf(node.id);
     if (index > -1) {
-      this.network[i].splice(index, 1);
+      this.network[layerIdx].splice(index, 1);
     } else {
       throw new Error ("cannot find node to remove");
     }
@@ -129,8 +140,9 @@ export class Network {
   addNode(layer:number) {
       this.nextNodeId++;
 
-      let node = new Node(this.nextNodeId.toString(), this.activation, layer, this.initZero);
+      let node = new Node(this.nextNodeId.toString(), this.activation, this.initZero);
       this.network[layer].push(node);
+      this.node2layer[node.id] = layer;
 
       // Add links from nodes in the previous layer to this node.
       for (let j = 0; j < this.network [layer-1].length; j++) {
@@ -146,28 +158,51 @@ export class Network {
   }
 
   addInput(nodeId) {
-    let node = new Node(nodeId, this.activation, 0, this.initZero);
+    let node = new Node(nodeId, this.activation, this.initZero);
     this.network[0].push(node);
+    this.node2layer[nodeId] = 0;
     for (let i=0; i<this.network[1].length; i++) {
       this.addLink(node, this.network[1][i]);
     }
   }
 
+  recomputeLongLinks() {
+    this.longLinks = [];
+    this.network.forEach((layer)=>{
+      layer.forEach((node)=>{
+        node.outputs.forEach((link)=>{
+          if (link.isLong()) {
+            this.longLinks.push(link);
+          }
+        }, this);
+      }, this);
+    }, this);
+  }
+
+  recomputeLayers() {
+    this.node2layer = {};
+    this.network.forEach((layer, layerIdx)=>{
+      layer.forEach((node)=>{
+        this.node2layer[node.id] = layerIdx;
+      }, this);
+    }, this);
+    this.recomputeLongLinks();
+  }
+
   addLink(fromNode:Node, toNode:Node) {
 
-    let link = new Link(fromNode, toNode, this.regularization, this.initZero);
+    let link = new Link(fromNode, toNode, this.regularization, this);
     fromNode.outputs.push(link);
     toNode.inputLinks.push(link);
-    if (toNode.layer - fromNode.layer > 1) {
+    if (link.isLong()) {
       this.longLinks.push(link);
-      link.isLong = true;
     }
 
   }
 
   removeLink(link:Link) {
 
-    if (link.dest.layer - link.source.layer > 1) {
+    if (link.isLong) {
       this.longLinks = this.longLinks.filter(function(x) {return x.id !== link.id; });
     }
 
@@ -244,15 +279,12 @@ export class Node {
   accError = 0;
   currError = 0;
 
-  layer : number;
-
   /**
    * Creates a new node with the provided id and activation function.
    */
-  constructor(id: string, activation: ActivationFunction, layer:number, initZero?: boolean) {
+  constructor(id: string, activation: ActivationFunction, initZero?: boolean) {
     this.id = id;
     this.activation = activation;
-    this.layer = layer;
     if (initZero) {
       this.bias = 0;
     }
@@ -387,7 +419,7 @@ export class Link {
   error = 0;
   accError = 0;
   currError = 0;
-  isLong = false;
+  network : Network;
 
   /**
    * Constructs a link in the neural network initialized with random weight.
@@ -398,7 +430,7 @@ export class Link {
    *     penalty for this weight. If null, there will be no regularization.
    */
   constructor(source: Node, dest: Node,
-      regularization: RegularizationFunction, initZero?: boolean) {
+      regularization: RegularizationFunction, n:Network) {
 
     // check link does not already exist
     if (source.isLinked(dest)) {
@@ -409,10 +441,24 @@ export class Link {
     this.source = source;
     this.dest = dest;
     this.regularization = regularization;
-    if (initZero) {
+    this.network = n;
+    if (n.initZero) {
       this.weight = 0;
     }
     Link.id2Link[this.id] = this;
+  }
+
+  isLong() : boolean {
+    let n2l = this.network.node2layer;
+    return n2l[this.dest.id] - n2l[this.source.id] > 1;
+  }
+
+  sourceLayer() :number {
+   return this.network.node2layer[this.source.id];
+  }
+
+  destLayer() :number {
+    return this.network.node2layer[this.dest.id];
   }
 
 }
