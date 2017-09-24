@@ -75,7 +75,6 @@ let HIDABLE_CONTROLS = [
   ["Ratio train data", "percTrainData"],
   ["Noise level", "noise"],
   ["Batch size", "batchSize"],
-  ["# of hidden layers", "numHiddenLayers"],
 ];
 
 class Player {
@@ -228,14 +227,6 @@ function makeGUI() {
   d3.select(`canvas[data-regDataset=${regDatasetKey}]`)
     .classed("selected", true);
 
-  d3.select("#add-layers").on("click", () => {
-    if (state.numHiddenLayers >= 6) {
-      return;
-    }
-    state.networkShape[state.numHiddenLayers] = 2;
-    state.numHiddenLayers++;
-    reset();
-  });
 
   let showTestData = d3.select("#show-test-data").on("change", function() {
     state.showTestData = this.checked;

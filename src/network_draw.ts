@@ -279,7 +279,7 @@ export function drawNetwork(n: nn.Network): void {
   // Draw the intermediate layers.
   for (let layerIdx = 1; layerIdx < numLayers - 1; layerIdx++) {
     let numNodes = network[layerIdx].length;
-    addPlusMinusControl(layerScale(layerIdx), layerIdx, netUI);
+    addPlusMinusControl(layerScale(layerIdx), layerIdx, n);
     for (let i = 0; i < numNodes; i++) {
       let node = network[layerIdx][i]
       drawNode(netUI, node.id, false, container, node);
@@ -287,20 +287,14 @@ export function drawNetwork(n: nn.Network): void {
   }
 
   // add control for layers
-  let div = d3.select("#layer-headers");
-  div.html('');
-  for (let layerIdx = 1; layerIdx < numLayers; layerIdx++){
-    div.append("button")
-      .attr("class", "mdl-button mdl-js-button mdl-button--icon")
-      .on("click", () => {
-        n.addLayer(layerIdx);
-        reset();
-      })
-      .append("i")
-      .attr("class", "material-icons")
-      .text("add");
-
+  d3.selectAll(".plus-minus-layers").remove();
+  addLayerControl(1,layerScale(1) - 40);
+  for (let layerIdx = 2; layerIdx < numLayers - 1; layerIdx++){
+    let x = (layerScale(layerIdx) + layerScale(layerIdx-1))/2;
+    addLayerControl(layerIdx,x);
   }
+  addLayerControl(numLayers-1,layerScale(numLayers-2) + 40);
+
 
   // Draw links.
   for (let layerIdx = 1; layerIdx < numLayers - 1; layerIdx++) {
@@ -346,12 +340,30 @@ function getRelativeHeight(selection: d3.Selection<any>) {
   return node.offsetHeight + node.offsetTop;
 }
 
-function addPlusMinusControl(x: number, layerIdx: number, netUI:NetworkUI) {
+function addLayerControl(layer:number, x:number) {
+
+  let div = d3.select("#network");
+  div.append("button")
+    .attr("class", "mdl-button mdl-js-button mdl-button--icon plus-minus-layers")
+    .style({
+      left: x+8 + 'px',
+    })
+    .on("click", () => {
+      n.addLayer(layer);
+      reset();
+    })
+    .append("i")
+    .attr("class", "material-icons")
+    .text("add");
+
+}
+
+function addPlusMinusControl(x: number, layerIdx: number, n:nn.Network) {
   let div = d3.select("#network").append("div")
     .classed("plus-minus-neurons", true)
     .style("left", `${x - 10}px`);
 
-  let numNeurons = netUI.layout[layerIdx].length;
+  let numNeurons = n.network[layerIdx].length;
   div.append("button")
     .attr("class", "mdl-button mdl-js-button mdl-button--icon")
     .style({
@@ -387,7 +399,7 @@ function addPlusMinusControl(x: number, layerIdx: number, netUI:NetworkUI) {
   firstRow.append("button")
     .attr("class", "mdl-button mdl-js-button mdl-button--icon")
     .on("click", () => {
-      let numNeurons = netUI.layout[layerIdx].length;
+      let numNeurons = n.network[layerIdx].length;
       if (numNeurons <= 1) {
         return;
       }

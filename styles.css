@@ -765,14 +765,15 @@ g.column rect {
   margin-right: 5px;
 }
 
-#layer-headers {
-  width: 100%;
-  display: flex;
-  justify-content: space-between;
-}
-
-#layer-headers button {
-  /*position: absolute;*/
+.plus-minus-layers {
+  position: absolute;
+  text-align: center;
+  line-height: 28px;
+  top: -98px;
+  width: 65px;
+  height: 44px;
+  font-size: 12px;
+  z-index: 100;
 }
 
 .hidden-layers.column {
@@ -783,7 +784,7 @@ g.column rect {
   -webkit-justify-content: center;
   justify-content: center;
   margin-top: -10px;
-  padding-bottom: 0;
+  padding-bottom: 28px;
 }
 
 .hidden-layers #layers-label {
