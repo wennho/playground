@@ -102,6 +102,14 @@ export class Network {
     this.recomputeLayers();
   }
 
+  // layerIdx will be the index of the new layer
+  addLayer(layerIdx:number){
+    this.network.splice(layerIdx,0,[]);
+    this.addNode(layerIdx);
+    this.recomputeLayers();
+  }
+
+
   removeNode(node: Node) {
 
     // Remove links

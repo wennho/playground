@@ -292,11 +292,12 @@ export function drawNetwork(n: nn.Network): void {
   // add control for layers
   let div = d3.select("#layer-headers");
   div.html('');
-  for (let layerIdx = 0; layerIdx < numLayers - 1; layerIdx++){
+  for (let layerIdx = 1; layerIdx < numLayers; layerIdx++){
     div.append("button")
       .attr("class", "mdl-button mdl-js-button mdl-button--icon")
       .on("click", () => {
-
+        n.addLayer(layerIdx);
+        reset();
       })
       .append("i")
       .attr("class", "material-icons")
