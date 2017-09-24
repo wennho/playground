@@ -249,7 +249,7 @@ header h1 .optional {
   display: -ms-flexbox;
   display: -webkit-flex;
   display: flex;
-  -webkit-justify-content: space-betweenspace-between;
+  -webkit-justify-content: space-between;
   justify-content: space-between;
 }
 
@@ -602,10 +602,6 @@ g.column rect {
   z-index: 100;
 }
 
-.plus-minus-neurons .mdl-button:first-of-type {
-  margin-right: 5px;
-}
-
 .features.column .callout {
   position: absolute;
   width: 95px;
@@ -761,6 +757,24 @@ g.column rect {
 
 /* Hidden layers column */
 
+.plus-minus-neurons .ui-layer {
+  top: -100px;
+}
+
+.plus-minus-neurons .mdl-button:first-of-type {
+  margin-right: 5px;
+}
+
+#layer-headers {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+}
+
+#layer-headers button {
+  /*position: absolute;*/
+}
+
 .hidden-layers.column {
   width: 40%;
 }
@@ -768,7 +782,8 @@ g.column rect {
 #main-part .hidden-layers h4 {
   -webkit-justify-content: center;
   justify-content: center;
-  margin-top: -5px;
+  margin-top: -10px;
+  padding-bottom: 0;
 }
 
 .hidden-layers #layers-label {

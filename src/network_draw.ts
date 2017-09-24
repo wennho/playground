@@ -271,8 +271,6 @@ export function drawNetwork(n: nn.Network): void {
 
   let calloutThumb = d3.select(".callout.thumbnail").style("display", "none");
   let calloutWeights = d3.select(".callout.weights").style("display", "none");
-  let idWithCallout = null;
-  let targetIdWithCallout = null;
   let netUI = new NetworkUI(n,width);
 
   // Draw the input layer separately.
@@ -291,6 +289,21 @@ export function drawNetwork(n: nn.Network): void {
     }
   }
 
+  // add control for layers
+  let div = d3.select("#layer-headers");
+  div.html('');
+  for (let layerIdx = 0; layerIdx < numLayers - 1; layerIdx++){
+    div.append("button")
+      .attr("class", "mdl-button mdl-js-button mdl-button--icon")
+      .on("click", () => {
+
+      })
+      .append("i")
+      .attr("class", "material-icons")
+      .text("add");
+
+  }
+
   // Draw links.
   for (let layerIdx = 1; layerIdx < numLayers - 1; layerIdx++) {
     let numNodes = network[layerIdx].length;
@@ -298,13 +311,7 @@ export function drawNetwork(n: nn.Network): void {
       let node = network[layerIdx][i];
       for (let j = 0; j < node.inputLinks.length; j++) {
         let link = node.inputLinks[j];
-
-        let path: SVGPathElement = drawLink(link, netUI,
-          container).node() as any;
-        // Show callout to weights.
-        let prevLayer = network[layerIdx - 1];
-        let lastNodePrevLayer = prevLayer[prevLayer.length - 1];
-
+        drawLink(link, netUI, container).node() as any;
       }
     }
   }
@@ -318,8 +325,7 @@ export function drawNetwork(n: nn.Network): void {
     }
   });
 
-
-  // Draw links.
+  // Draw links to output.
   for (let i = 0; i < node.inputLinks.length; i++) {
     let link = node.inputLinks[i];
     drawLink(link, netUI, container);
@@ -350,6 +356,24 @@ function addPlusMinusControl(x: number, layerIdx: number) {
     .style("left", `${x - 10}px`);
 
   let i = layerIdx - 1;
+
+  div.append("button")
+    .attr("class", "mdl-button mdl-js-button mdl-button--icon")
+    .style({
+      position:"absolute",
+      top:"-40px",
+      left:0,
+      right:0,
+      "margin-right":"auto",
+      "margin-left":"auto",
+    })
+    .on("click", () => {
+
+    })
+    .append("i")
+    .attr("class", "material-icons")
+    .text("remove");
+
   let firstRow = div.append("div").attr("class", `ui-numNodes${layerIdx}`);
   firstRow.append("button")
     .attr("class", "mdl-button mdl-js-button mdl-button--icon")
