@@ -276,16 +276,6 @@ export function drawNetwork(n: nn.Network): void {
     drawNode(netUI, nodeId, true, container);
   });
 
-  // Draw the intermediate layers.
-  for (let layerIdx = 1; layerIdx < numLayers - 1; layerIdx++) {
-    let numNodes = network[layerIdx].length;
-    addPlusMinusControl(layerScale(layerIdx), layerIdx, n);
-    for (let i = 0; i < numNodes; i++) {
-      let node = network[layerIdx][i]
-      drawNode(netUI, node.id, false, container, node);
-    }
-  }
-
   // add control for layers
   d3.selectAll(".plus-minus-layers").remove();
   addLayerControl(1,layerScale(1) - 40);
@@ -307,6 +297,17 @@ export function drawNetwork(n: nn.Network): void {
       }
     }
   }
+
+  // Draw the intermediate layers. Draw this after links so that it is on top
+  for (let layerIdx = 1; layerIdx < numLayers - 1; layerIdx++) {
+    let numNodes = network[layerIdx].length;
+    addPlusMinusControl(layerScale(layerIdx), layerIdx, n);
+    for (let i = 0; i < numNodes; i++) {
+      let node = network[layerIdx][i]
+      drawNode(netUI, node.id, false, container, node);
+    }
+  }
+
 
   // Output node is drawn separately
   let node = network[numLayers - 1][0];
