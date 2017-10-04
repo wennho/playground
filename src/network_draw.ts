@@ -236,6 +236,17 @@ export class NetworkUI {
   }
 }
 
+export interface CallbackObj {execute: (netUI:NetworkUI, container:d3.Selection<any>) => void};
+
+export function updateNetwork(n:nn.Network, callbackObj:CallbackObj) {
+  let container = d3.select("#svg g.core");
+  let co = d3.select(".column.output").node() as HTMLDivElement;
+  let cf = d3.select(".column.features").node() as HTMLDivElement;
+  let width = co.offsetLeft - cf.offsetLeft;
+  let netUI = new NetworkUI(n,width);
+
+  callbackObj.execute(netUI, container);
+}
 
 
 // Draw network
@@ -390,8 +401,12 @@ function addPlusMinusControl(x: number, layerIdx: number, n:nn.Network) {
       if (numNeurons >= 8) {
         return;
       }
-      n.addNode(layerIdx);
-      reset();
+      let node = n.addNode(layerIdx);
+      reset(false,true,{
+        execute: function(netUI, container){
+          drawNode(netUI, node.id, false, container, node, true);
+        },
+      });
     })
     .append("i")
     .attr("class", "material-icons")
@@ -622,7 +637,7 @@ function selectNode(div, node : nn.Node) {
 
 
 function drawNode(netUI:NetworkUI, nodeId: string, isInput: boolean,
-                  container: d3.Selection<any>, node?: nn.Node) {
+                  container: d3.Selection<any>, node?: nn.Node, animate=false) {
   let element = netUI.id2elem[nodeId];
   let x = element.cx - RECT_SIZE / 2;
   let y = element.cy - RECT_SIZE / 2;
@@ -631,7 +646,8 @@ function drawNode(netUI:NetworkUI, nodeId: string, isInput: boolean,
     .attr({
       "class": "node",
       "id": `node${nodeId}`,
-      "transform": `translate(${x},${y})`
+      "transform": `translate(${x},${y})`,
+      "opacity": 0,
     });
 
   // Draw the main rectangle.
@@ -721,6 +737,13 @@ function drawNode(netUI:NetworkUI, nodeId: string, isInput: boolean,
     }).on("mouseleave", function() {
       updateHoverCard(null);
     });
+  }
+
+  // done with nodegroup data. Can render now
+  if (animate) {
+    nodeGroup.transition().style("opacity",1);
+  } else {
+    nodeGroup.style("opacity",1);
   }
 
   // Draw the node's canvas.

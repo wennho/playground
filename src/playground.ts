@@ -33,7 +33,7 @@ import {
   drawNetwork,
   n,
   setNetwork,
-  selectedNodeId,
+  selectedNodeId, updateNetwork, CallbackObj,
 } from "./network_draw"
 
 let mainWidth;
@@ -529,7 +529,7 @@ function oneStep(): void {
 }
 
 
-export function reset(onStartup=false) {
+export function reset(onStartup=false, noRedraw=false, callbackObj?:CallbackObj) {
 
   if (!onStartup) {
     state.networkShape = n.getShape();
@@ -561,7 +561,11 @@ export function reset(onStartup=false) {
   lossTrain = getLoss(n.network, trainData);
   lossTest = getLoss(n.network, testData);
 
-  drawNetwork(n);
+  if (noRedraw) {
+    updateNetwork(n, callbackObj);
+  } else {
+    drawNetwork(n);
+  }
   updateUI(true);
 };
 

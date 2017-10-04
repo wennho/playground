@@ -144,7 +144,7 @@ export class Network {
     throw new Error ("cannot find node");
   }
 
-  // layer 0 corresponds to the input layer
+  // layer 0 corresponds to the input layer. Returns the node created
   addNode(layer:number) {
       this.nextNodeId++;
 
@@ -163,6 +163,8 @@ export class Network {
           let nextNode = this.network [layer+1][j];
           this.addLink(node,nextNode);
       }
+
+      return node;
   }
 
   addInput(nodeId) {
