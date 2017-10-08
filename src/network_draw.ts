@@ -503,7 +503,7 @@ function calculateOffset(index, length) {
 
 function drawLink(
   link: nn.Link, netUI: NetworkUI,
-  container: d3.Selection<any>) {
+  container: d3.Selection<any>, animate=false) {
   let line = container.insert("path", ":first-child");
   let source = netUI.id2elem[link.source.id];
   let dest = netUI.id2elem[link.dest.id];
