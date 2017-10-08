@@ -251,9 +251,6 @@ export class NetworkUI {
 }
 
 export function update(n: nn.Network){
-  var t = d3.transition().duration(750);
-
-  let container = d3.select("#svg g.core");
 
   // Get the width of the svg container.
   let co = d3.select(".column.output").node() as HTMLDivElement;
@@ -266,9 +263,8 @@ export function update(n: nn.Network){
   let canvasNodes = d3.select("#network").selectAll("div.canvas").data(netUI.nodes, function (d) { return d.id;});
 
   // UPDATE
-  // shift existing nodes to their new poistions
+  // shift existing nodes to their new positions
   canvasNodes.transition()
-    .duration(750)
     .style('left',function (d) {
       let x = d.cx - RECT_SIZE / 2;
       return `${x + 3}px`;
@@ -278,14 +274,26 @@ export function update(n: nn.Network){
       return `${y + 3}px`;
     });
 
-
   // ENTER
   // Create new elements as needed.
-  canvasNodes.enter().insert("div", ":first-child").each(drawNodeCanvas);
+  canvasNodes.enter().insert("div", ":first-child")
+    .style("opacity", 1e-6)
+    .each(drawNodeCanvas)
+    .transition()
+    .duration(500)
+    .style("opacity", 1);
 
   // EXIT
   // Remove old elements as needed.
-  canvasNodes.exit().remove();
+  canvasNodes.exit()
+    .each(function (d){
+      d3.select(this)
+        .select("canvas.node-heat-map")
+        .classed("node-heat-map", false);
+    })
+    .transition()
+    .style("opacity", 1e-6)
+    .remove();
 
 }
 
