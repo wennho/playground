@@ -529,7 +529,7 @@ function oneStep(): void {
 }
 
 
-export function reset(onStartup=false, noRedraw=false, callbackObj?:CallbackObj) {
+export function reset(onStartup=false) {
 
   if (!onStartup) {
     state.networkShape = n.getShape();
@@ -561,11 +561,8 @@ export function reset(onStartup=false, noRedraw=false, callbackObj?:CallbackObj)
   lossTrain = getLoss(n.network, trainData);
   lossTest = getLoss(n.network, testData);
 
-  if (noRedraw) {
-    updateNetwork(n, callbackObj);
-  } else {
-    drawNetwork(n);
-  }
+  drawNetwork(n);
+
   updateUI(true);
 };
 

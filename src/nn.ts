@@ -23,6 +23,7 @@ export class Network {
   regularization:RegularizationFunction;
   longLinks: Link[];
   node2layer: {[id:string]:number} = {};
+  id2node:{[id:string]:Node} = {};
 
   /**
    * Builds a neural network.
@@ -68,6 +69,8 @@ export class Network {
                   isOutputLayer ? outputActivation : activation, initZero);
               currentLayer.push(node);
               this.node2layer[nodeId] = layerIdx;
+              this.id2node[nodeId] = node;
+
               if (layerIdx >= 1) {
                   // Add links from nodes in the previous layer to this node.
                   for (let j = 0; j < this.network [layerIdx - 1].length; j++) {
@@ -122,8 +125,8 @@ export class Network {
       this.removeLink(node.outputs[0]);
     }
 
-
     // remove node from network
+    delete this.id2node[node.id];
     let layerIdx = this.node2layer[node.id];
     let index = this.network[layerIdx].map(function(x) {return x.id; }).indexOf(node.id);
     if (index > -1) {
@@ -151,6 +154,7 @@ export class Network {
       let node = new Node(this.nextNodeId.toString(), this.activation, this.initZero);
       this.network[layer].push(node);
       this.node2layer[node.id] = layer;
+      this.id2node[node.id] = node;
 
       // Add links from nodes in the previous layer to this node.
       for (let j = 0; j < this.network [layer-1].length; j++) {

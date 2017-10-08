@@ -42,7 +42,8 @@ class ElementUI {
   links: string[] = [];
   cx :number;
   cy : number;
-
+  isInput: boolean = false;
+  heatmap = null;
   constructor (id:string, type:ElementType, links:string[]) {
     this.id = id;
     this.type = type;
@@ -58,6 +59,18 @@ export class NetworkUI {
   id2pos : {[id:string] : any} = {};
   id2elem : {[id:string] : any} = {};
   maxY : number;
+  nodes : ElementUI[] = [];
+
+  updateNodeList() {
+    for (let i=0; i<this.layout.length;i++) {
+      for (let j=0; j<this.layout[i].length;j++) {
+        let ele = this.layout[i][j];
+        if (ele.type == ElementType.NODE) {
+          this.nodes.push(this.layout[i][j]);
+        }
+      }
+    }
+  }
 
   updateMapping() {
     this.layout.forEach( function (layer, layerIdx) {
@@ -148,7 +161,9 @@ export class NetworkUI {
       // do input layer separately
       if (layerIdx == 0 ) {
         return Object.keys(INPUTS).map((nodeId) => {
-          return new ElementUI(nodeId, ElementType.NODE, []);
+          let ele = new ElementUI(nodeId, ElementType.NODE, []);
+          ele.isInput = true;
+          return ele;
         });
       }
 
@@ -174,19 +189,16 @@ export class NetworkUI {
       }
     }
 
+
     posToAdd.forEach(function (v , layerIdx) {
-
       if (Object.keys(v).length == 0) return;
-
       let posList = Object.keys(v).sort();
-
       posList.forEach((pos : string) => {
         // pos is above all others. add elements until we reach the right pos
         while  (!this.layout[layerIdx].hasOwnProperty(pos)) {
             let newElement = new ElementUI(null, ElementType.LINK, []);
             this.layout[layerIdx].push(newElement);
         }
-
         v[pos].forEach((link) => {
           let element = this.layout[layerIdx][pos];
           if (element.type == ElementType.LINK) {
@@ -197,8 +209,6 @@ export class NetworkUI {
           }
         }, this);
       }, this);
-
-
     }, this);
 
     this.updateMapping();
@@ -233,6 +243,8 @@ export class NetworkUI {
 
     this.maxY = Math.max(...(this.layout.map((layer) => nodeIndexScale(layer.length))));
     this.maxY = Math.max(this.maxY, nodeIndexScale(nodeIds.length));
+
+    this.updateNodeList();
   }
 }
 
@@ -249,6 +261,34 @@ export function updateNetwork(n:nn.Network, callbackObj:CallbackObj) {
 }
 
 
+
+export function update(n: nn.Network){
+  var t = d3.transition().duration(750);
+
+  let container = d3.select("#svg g.core");
+
+  // Get the width of the svg container.
+  let co = d3.select(".column.output").node() as HTMLDivElement;
+  let cf = d3.select(".column.features").node() as HTMLDivElement;
+  let width = co.offsetLeft - cf.offsetLeft;
+
+  let netUI = new NetworkUI(n,width);
+
+  // JOIN new data with old elements.
+  let canvasNodes = d3.select("#network").selectAll("div.canvas").data(netUI.nodes, function (d) { return d.id;});
+
+  // ENTER
+  // Create new elements as needed.
+  canvasNodes.enter().insert("div", ":first-child").each(drawNodeCanvas);
+
+  // EXIT
+  // Remove old elements as needed.
+  canvasNodes.exit().remove();
+
+}
+
+
+
 // Draw network
 export function drawNetwork(n: nn.Network): void {
   let network: nn.Node[][] = n.network;
@@ -256,7 +296,6 @@ export function drawNetwork(n: nn.Network): void {
   // Remove all svg elements.
   svg.select("g.core").remove();
   // Remove all div elements.
-  d3.select("#network").selectAll("div.canvas").remove();
   d3.select("#network").selectAll("div.plus-minus-neurons").remove();
 
   // Get the width of the svg container.
@@ -345,6 +384,8 @@ export function drawNetwork(n: nn.Network): void {
     getRelativeHeight(d3.select("#network"))
   );
   d3.select(".column.features").style("height", height + "px");
+
+  update(n);
 }
 
 function getRelativeHeight(selection: d3.Selection<any>) {
@@ -402,11 +443,7 @@ function addPlusMinusControl(x: number, layerIdx: number, n:nn.Network) {
         return;
       }
       let node = n.addNode(layerIdx);
-      reset(false,true,{
-        execute: function(netUI, container){
-          drawNode(netUI, node.id, false, container, node, true);
-        },
-      });
+      reset(false);
     })
     .append("i")
     .attr("class", "material-icons")
@@ -635,6 +672,80 @@ function selectNode(div, node : nn.Node) {
   }
 }
 
+// Draws the heatmap portion of the node
+function drawNodeCanvas(d : ElementUI){
+
+  if (d.type != ElementType.NODE) {
+    throw new Error("Not a node element");
+  }
+
+  if (d.id == n.getOutputNode().id) {
+    return; // no need to draw heatmap for output node
+  }
+
+  let div = d3.select(this);
+  let x = d.cx - RECT_SIZE / 2;
+  let y = d.cy - RECT_SIZE / 2;
+
+  // Draw the node's canvas.
+  div.attr({
+      "id": `canvas-${d.id}`,
+      "class": "canvas"
+    })
+    .style({
+      position: "absolute",
+      left: `${x + 3}px`,
+      top: `${y + 3}px`
+    })
+    .on("mouseenter", function() {
+      selectedNodeId = d.id;
+      div.classed("hovered", true);
+      updateDecisionBoundary(n.network, false);
+      heatMap.updateBackground(boundary[d.id], state.discretize);
+    })
+    .on("mouseleave", function() {
+      selectedNodeId = null;
+      div.classed("hovered", false);
+      updateDecisionBoundary(n.network, false);
+      heatMap.updateBackground(boundary[n.getOutputNode().id],
+        state.discretize);
+    })
+    .on("click", function(){
+      if (mode == Mode.AddEdge) {
+        selectNode(div, n.id2node[d.id]);
+      }
+    });
+
+  if (d.isInput) {
+    div.on("click", function() {
+
+      if (mode == Mode.AddEdge) {
+        selectNode(div, n.findNode(d.id));
+        return;
+      }
+
+      // add or remove input node
+      state[d.id] = !state[d.id];
+      if (state[d.id]) {
+        n.addInput(d.id);
+      } else {
+        n.removeNode(n.findNode(d.id));
+      }
+
+      reset();
+    });
+    div.style("cursor", "pointer");
+
+    let activeOrNotClass = state[d.id] ? "active" : "inactive";
+    div.classed(activeOrNotClass, true);
+  }
+
+  d.heatmap = new HeatMap(RECT_SIZE, DENSITY / 10, xDomain,
+    xDomain, div, {noSvg: true});
+
+}
+
+
 
 function drawNode(netUI:NetworkUI, nodeId: string, isInput: boolean,
                   container: d3.Selection<any>, node?: nn.Node, animate=false) {
@@ -721,9 +832,6 @@ function drawNode(netUI:NetworkUI, nodeId: string, isInput: boolean,
     });
     errorText.text('Error:');
 
-  }
-
-  if (!isInput) {
     // Draw the node's bias.
     nodeGroup.append("rect")
       .attr({
@@ -745,64 +853,5 @@ function drawNode(netUI:NetworkUI, nodeId: string, isInput: boolean,
   } else {
     nodeGroup.style("opacity",1);
   }
-
-  // Draw the node's canvas.
-  let div = d3.select("#network").insert("div", ":first-child")
-    .attr({
-      "id": `canvas-${nodeId}`,
-      "class": "canvas"
-    })
-    .style({
-      position: "absolute",
-      left: `${x + 3}px`,
-      top: `${y + 3}px`
-    })
-    .on("mouseenter", function() {
-      selectedNodeId = nodeId;
-      div.classed("hovered", true);
-      nodeGroup.classed("hovered", true);
-      updateDecisionBoundary(n.network, false);
-      heatMap.updateBackground(boundary[nodeId], state.discretize);
-    })
-    .on("mouseleave", function() {
-      selectedNodeId = null;
-      div.classed("hovered", false);
-      nodeGroup.classed("hovered", false);
-      updateDecisionBoundary(n.network, false);
-      heatMap.updateBackground(boundary[n.getOutputNode().id],
-        state.discretize);
-    })
-    .on("click", function(){
-      if (mode == Mode.AddEdge) {
-        selectNode(div, node);
-      }
-    });
-
-  if (isInput) {
-    div.on("click", function() {
-
-      if (mode == Mode.AddEdge) {
-        selectNode(div, n.findNode(nodeId));
-        return;
-      }
-
-      // add or remove input node
-      state[nodeId] = !state[nodeId];
-      if (state[nodeId]) {
-        n.addInput(nodeId);
-      } else {
-        n.removeNode(n.findNode(nodeId));
-      }
-
-      reset();
-    });
-    div.style("cursor", "pointer");
-  }
-  if (isInput) {
-    div.classed(activeOrNotClass, true);
-  }
-  let nodeHeatMap = new HeatMap(RECT_SIZE, DENSITY / 10, xDomain,
-    xDomain, div, {noSvg: true});
-  div.datum({heatmap: nodeHeatMap, id: nodeId});
 
 }
