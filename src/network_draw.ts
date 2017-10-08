@@ -260,7 +260,10 @@ export function update(n: nn.Network){
   let netUI = new NetworkUI(n,width);
 
   // JOIN new data with old elements.
-  let canvasNodes = d3.select("#network").selectAll("div.canvas").data(netUI.nodes, function (d) { return d.id;});
+  let canvasNodes =
+    d3.select("#network")
+    .selectAll("div.canvas")
+    .data(netUI.nodes, function (d) { return d.id;});
 
   // UPDATE
   // shift existing nodes to their new positions
@@ -289,6 +292,7 @@ export function update(n: nn.Network){
     .each(function (d){
       d3.select(this)
         .select("canvas.node-heat-map")
+        // remove the class so that it's not called by heatmap.updateBackground
         .classed("node-heat-map", false);
     })
     .transition()
