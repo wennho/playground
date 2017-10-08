@@ -43,13 +43,13 @@ class ElementUI {
   cx :number;
   cy : number;
   isInput: boolean = false;
-  heatmap = null;
+
   constructor (id:string, type:ElementType, links:string[]) {
     this.id = id;
     this.type = type;
     this.links = links;
   }
-};
+}
 
 
 export class NetworkUI {
@@ -72,6 +72,7 @@ export class NetworkUI {
     }
   }
 
+  // update the id2elem and id2pos mappings
   updateMapping() {
     this.layout.forEach( function (layer, layerIdx) {
       layer.forEach(function (element, index) {
@@ -128,6 +129,7 @@ export class NetworkUI {
 
   }
 
+  // sort the link ordering that goes to each element
   updateOrdering(){
     for (let i=1; i<this.layout.length; i++) {
 
@@ -144,7 +146,7 @@ export class NetworkUI {
     }
   }
 
-  constructor (n: nn.Network, width:number) {
+  constructor (n: nn.Network, width:number, oldNetUI?:NetworkUI) {
 
     // Draw the network layer by layer.
     let numLayers = n.network.length;
@@ -250,17 +252,6 @@ export class NetworkUI {
 
 export interface CallbackObj {execute: (netUI:NetworkUI, container:d3.Selection<any>) => void};
 
-export function updateNetwork(n:nn.Network, callbackObj:CallbackObj) {
-  let container = d3.select("#svg g.core");
-  let co = d3.select(".column.output").node() as HTMLDivElement;
-  let cf = d3.select(".column.features").node() as HTMLDivElement;
-  let width = co.offsetLeft - cf.offsetLeft;
-  let netUI = new NetworkUI(n,width);
-
-  callbackObj.execute(netUI, container);
-}
-
-
 
 export function update(n: nn.Network){
   var t = d3.transition().duration(750);
@@ -280,6 +271,11 @@ export function update(n: nn.Network){
   // ENTER
   // Create new elements as needed.
   canvasNodes.enter().insert("div", ":first-child").each(drawNodeCanvas);
+
+  // ENTER + UPDATE
+  // After merging the entered elements with the update selection,
+  // apply operations to both.
+
 
   // EXIT
   // Remove old elements as needed.
@@ -740,8 +736,10 @@ function drawNodeCanvas(d : ElementUI){
     div.classed(activeOrNotClass, true);
   }
 
-  d.heatmap = new HeatMap(RECT_SIZE, DENSITY / 10, xDomain,
+  let nodeHeatMap = new HeatMap(RECT_SIZE, DENSITY / 10, xDomain,
     xDomain, div, {noSvg: true});
+
+  nodeHeatMap.canvas.datum({heatmap: nodeHeatMap, id: d.id});
 
 }
 

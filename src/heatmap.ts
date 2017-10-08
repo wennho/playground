@@ -38,7 +38,7 @@ export class HeatMap {
   private yScale: d3.scale.Linear<number, number>;
   private numSamples: number;
   private color: d3.scale.Quantize<string>;
-  private canvas: d3.Selection<any>;
+  canvas: d3.Selection<any>;
   private svg: d3.Selection<any>;
 
   constructor(
@@ -89,6 +89,7 @@ export class HeatMap {
         left: `-${padding}px`
       });
     this.canvas = container.append("canvas")
+      .attr("class", "node-heat-map")
       .attr("width", numSamples)
       .attr("height", numSamples)
       .style("width", (width - 2 * padding) + "px")

@@ -33,7 +33,7 @@ import {
   drawNetwork,
   n,
   setNetwork,
-  selectedNodeId, updateNetwork, CallbackObj,
+  selectedNodeId,
 } from "./network_draw"
 
 let mainWidth;
@@ -139,7 +139,7 @@ export let boundary: {[id: string]: number[][]} = {};
 // Plot the heatmap.
 export let xDomain: [number, number] = [-6, 6];
 export let heatMap =
-    new HeatMap(300, DENSITY, xDomain, xDomain, d3.select("#heatmap"),
+  new HeatMap(300, DENSITY, xDomain, xDomain, d3.select("#heatmap"),
         {showAxes: true});
 let linkWidthScale = d3.scale.linear()
   .domain([0, 5])
@@ -466,7 +466,7 @@ export function updateUI(firstStep = false) {
   heatMap.updateBackground(boundary[selectedId], state.discretize);
 
   // Update all decision boundaries.
-  d3.select("#network").selectAll("div.canvas")
+  d3.select("#network").selectAll("canvas.node-heat-map")
       .each(function(data: {heatmap: HeatMap, id: string}) {
     data.heatmap.updateBackground(reduceMatrix(boundary[data.id], 10),
         state.discretize);
