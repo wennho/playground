@@ -250,9 +250,6 @@ export class NetworkUI {
   }
 }
 
-export interface CallbackObj {execute: (netUI:NetworkUI, container:d3.Selection<any>) => void};
-
-
 export function update(n: nn.Network){
   var t = d3.transition().duration(750);
 
@@ -268,14 +265,23 @@ export function update(n: nn.Network){
   // JOIN new data with old elements.
   let canvasNodes = d3.select("#network").selectAll("div.canvas").data(netUI.nodes, function (d) { return d.id;});
 
+  // UPDATE
+  // shift existing nodes to their new poistions
+  canvasNodes.transition()
+    .duration(750)
+    .style('left',function (d) {
+      let x = d.cx - RECT_SIZE / 2;
+      return `${x + 3}px`;
+    })
+    .style('top',function (d) {
+      let y = d.cy - RECT_SIZE / 2;
+      return `${y + 3}px`;
+    });
+
+
   // ENTER
   // Create new elements as needed.
   canvasNodes.enter().insert("div", ":first-child").each(drawNodeCanvas);
-
-  // ENTER + UPDATE
-  // After merging the entered elements with the update selection,
-  // apply operations to both.
-
 
   // EXIT
   // Remove old elements as needed.
