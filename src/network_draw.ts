@@ -309,7 +309,7 @@ function updateHoverCard(type: ElementType, nodeOrLink?: nn.Node | nn.Link,
   d3.select("#svg").on("click", () => {
 
     if (state.mode === Mode.DeleteEdge && nodeOrLink instanceof nn.Link) {
-      n.removeLink(nodeOrLink, true);
+      n.removeLink(nodeOrLink);
       let hovercard = d3.select("#hovercard");
       hovercard.style("display", "none");
       d3.select("#svg").on("click", null);
@@ -508,13 +508,28 @@ function selectNode(div, node : nn.Node) {
     // first check that link does not already exist
     let selectedNodeLayer = n.node2layer[selectedNode.id];
     let nodeLayer = n.node2layer[node.id];
+    let fromNode;
+    let toNode;
+
     if (selectedNodeLayer == nodeLayer || selectedNode.isLinked(node)) {
-      d3.select('#info').text('Cannot create link. Invalid target.');
-      return;
+
+      // check for a case where one of the nodes has no inputs. Then we can create a link.
+      if (selectedNode.inputLinks.length == 0 && node.inputLinks.length > 0) {
+        fromNode = node;
+        toNode = selectedNode;
+      } else if (node.inputLinks.length == 0 && selectedNode.inputLinks.length > 0) {
+        fromNode = selectedNode;
+        toNode = node;
+      } else {
+        // too bad, it is invalid
+        d3.select('#info').text('Cannot create link. Invalid target.');
+        return;
+      }
+    } else {
+      fromNode = selectedNodeLayer < nodeLayer ? selectedNode : node;
+      toNode = selectedNodeLayer > nodeLayer ? selectedNode : node;
     }
 
-    let fromNode = selectedNodeLayer < nodeLayer ? selectedNode : node;
-    let toNode = selectedNodeLayer > nodeLayer ? selectedNode : node;
     n.addLink(fromNode, toNode);
     d3.select('#info').text('Link between nodes ' + node.id + ' and ' + selectedNode.id + ' created.');
     selectedNode = null;

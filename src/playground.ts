@@ -527,15 +527,17 @@ function oneStep(): void {
 export function reset(onStartup=false) {
 
   if (!onStartup) {
+    userHasInteracted();
+  }
+  player.pause();
+
+  if (!onStartup) {
+    n.recomputeLayers();
     state.networkShape = n.getShape();
   }
 
   lineChart.reset();
   state.serialize();
-  if (!onStartup) {
-    userHasInteracted();
-  }
-  player.pause();
 
   if (onStartup) {
       // Make a simple network.

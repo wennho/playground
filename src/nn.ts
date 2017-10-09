@@ -134,7 +134,6 @@ export class Network {
       throw new Error ("cannot find node to remove");
     }
 
-    this.recomputeLayers();
   }
 
   findNode(nodeId: string) {
@@ -195,6 +194,32 @@ export class Network {
     }, this);
   }
 
+  // populate new network layers, using the old network as reference for ordering
+  // orphaned nodes are returned in an array
+  assignLayers(id2layer, newNetwork) {
+    let toVisit = [];
+    for (let i=0; i<this.network.length; i++){
+      let layer = this.network[i];
+      for (let j=0; j<layer.length;j++) {
+        let node = layer[j];
+        if (id2layer.hasOwnProperty(node.id)) {
+          let layerIdx = id2layer[node.id];
+          while (newNetwork.length <= layerIdx) {
+            newNetwork.push([]);
+          }
+          newNetwork[layerIdx].push(node);
+        } else {
+
+          if (node.inputLinks.length == 0) {
+            // this node has no inputs. Place it for visiting again.
+            toVisit.push(node);
+          }
+        }
+      }
+    }
+    return toVisit;
+  }
+
   // assumes that input layers are on the first layer
   recomputeLayers() {
 
@@ -202,37 +227,46 @@ export class Network {
     let toVisitNext : Node[];
     let currentLayer = 0;
     let id2layer = {};
-    let newNetwork = [];
+    let newNetwork;
 
     // assign layers via breadth-first traversal from input nodes
     while (toVisit.length > 0) {
 
-      toVisitNext = [];
-      for (let i=0; i<toVisit.length;i++) {
-        let node = toVisit[i];
-        // this will also overwrite the last value. Since currentLayer always increases, this is the correct behaviour.
-        id2layer[node.id] = currentLayer;
-        node.outputs.forEach((link : Link)=>{
-          toVisitNext.push(link.dest);
-        });
+      while (toVisit.length > 0) {
+        toVisitNext = [];
+        for (let i = 0; i < toVisit.length; i++) {
+          let node = toVisit[i];
+
+          if (!id2layer.hasOwnProperty(node.id) || id2layer[node.id] < currentLayer) {
+            id2layer[node.id] = currentLayer;
+          }
+
+          node.outputs.forEach((link: Link) => {
+            toVisitNext.push(link.dest);
+          });
+        }
+        toVisit = toVisitNext;
+        currentLayer++;
+        if (currentLayer > 10) {
+          throw new Error("Too many layers");
+        }
       }
-      newNetwork.push([]);
-      toVisit = toVisitNext;
-      currentLayer++;
-      if (currentLayer > 10) {
-        throw new Error("Too many layers");
+
+      newNetwork = [];
+      // populate new network layers, using the old network as reference for ordering
+      // orphaned nodes are returned in an array
+      toVisit = this.assignLayers(id2layer, newNetwork);
+      let outputNodeID=this.getOutputNode().id;
+
+      // ensure orphaned nodes are always at the highest layer,
+      // but also check that there are no empty intermediate layers.
+      // if the output node has been assigned a layer, place orphaned nodes at an optimal level
+      // otherwise, place it at the next higher layer that hasn't been assigned
+      if (id2layer.hasOwnProperty(outputNodeID)) {
+        currentLayer = id2layer[outputNodeID];
       }
     }
 
-    // populate new network layers, using the old network as reference for ordering
-
-    for (let i=0; i<this.network.length; i++){
-      let layer = this.network[i];
-      for (let j=0; j<layer.length;j++) {
-        let node = layer[j];
-        newNetwork[id2layer[node.id]].push(node);
-      }
-    }
 
     this.node2layer = id2layer;
     this.network = newNetwork;
@@ -251,7 +285,7 @@ export class Network {
 
   }
 
-  removeLink(link:Link, recomputeLayers = false) {
+  removeLink(link:Link) {
 
     if (link.isLong()) {
       this.longLinks = this.longLinks.filter(function(x) {return x.id !== link.id; });
@@ -271,9 +305,6 @@ export class Network {
       throw new Error('Unable to remove input node - node not found');
     }
 
-    if (recomputeLayers) {
-      this.recomputeLayers();
-    }
   }
 
   /** Iterates over every node in the network/ */
