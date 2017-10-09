@@ -57,7 +57,7 @@ function d3updateLinks(netUI:NetworkUI){
 
   // UPDATE
   // shift existing nodes to their new positions
-
+  links.each(transitionLink);
 
   // ENTER
   // Create new elements as needed.
@@ -365,17 +365,12 @@ function calculateOffset(index, length) {
   return ((index - (length - 1) / 2) / length) * 12;
 }
 
-function drawLink(d:LinkData) {
-
-
-  let container = d3.select(this);
+function generateLinkPath(d:LinkData) : string {
   let link = d.link;
-  let line = container.insert("path", ":first-child");
   let source = d.sourceEle;
   let dest = d.destEle;
   let offset = RECT_SIZE * 1.2;
-  let dPath = null;
-
+  let dPath : string = null;
   let destInputLinks = dest.links;
   let indexBeforeDest = destInputLinks.indexOf(link.id);
   let destOffset = calculateOffset(indexBeforeDest, destInputLinks.length);
@@ -425,15 +420,45 @@ function drawLink(d:LinkData) {
       dest.cy + destOffset
     ]);
 
-
     var lineFunction = d3.svg.line()
       .x(function(d) { return d[0]; })
       .y(function(d) { return d[1]; })
       .interpolate("basis");
 
     dPath = lineFunction(lineData);
-
   }
+
+  return dPath;
+}
+
+
+function transitionLink(d:LinkData) {
+  let container = d3.select(this);
+  let dPath : string = generateLinkPath(d);
+
+  // back-most line to show error rate
+  container.select("path.errorlink")
+    .transition()
+    .attr("d", dPath);
+
+  // line to show weights
+  container.select("path.link")
+    .transition()
+    .attr("d", dPath);
+
+  // The invisible thick link that will be used for showing the weight value on hover.
+  container.select("path.link-hover")
+    .attr("d", dPath);
+}
+
+
+function drawLink(d:LinkData) {
+
+  let container = d3.select(this);
+  let line = container.insert("path", ":first-child");
+  let dPath : string = generateLinkPath(d);
+
+  let link = d.link;
 
   // back-most line to show error rate
   line.attr({
@@ -450,19 +475,18 @@ function drawLink(d:LinkData) {
     d: dPath
   });
 
-
   // Add an invisible thick link that will be used for showing the weight value on hover.
   // This has to be last so that it's on top.
   container.append("path")
-    .attr("d", dPath)
-    .attr("class", "link-hover")
+    .attr({
+      "d": dPath,
+      "class": "link-hover",
+    })
     .on("mouseenter", function() {
       updateHoverCard(ElementType.LINK, link, d3.mouse(this));
     }).on("mouseleave", function() {
-    updateHoverCard(null);
-  });
-
-  return line;
+      updateHoverCard(null);
+    });
 }
 
 let selectedNode : nn.Node = null;
