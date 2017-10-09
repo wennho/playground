@@ -1,21 +1,16 @@
 import * as nn from "./nn";
-import {reset, state, updateUI, DENSITY, xDomain, updateDecisionBoundary, heatMap, boundary} from "./playground"
+import {reset, updateUI, updateDecisionBoundary, heatMap, boundary} from "./playground"
 import {HeatMap} from "./heatmap";
 import {ElementType, ElementUI, NetworkUI, RECT_SIZE} from "./network_ui";
-import {INPUTS} from "./common";
-import {Mode} from "./state";
+import {INPUTS, DENSITY, xDomain} from "./common";
+import {Mode, state} from "./state";
 
 const BIAS_SIZE = 5;
-
-
 
 export let n: nn.Network = null;
 export function setNetwork(network:nn.Network) {
   n = network;
 }
-
-
-
 
 function d3update(n: nn.Network) {
 
@@ -27,9 +22,6 @@ function d3update(n: nn.Network) {
   let netUI = new NetworkUI(n, width);
   d3updateNodes(netUI);
 }
-
-
-
 
 function d3updateNodes(netUI:NetworkUI){
 

@@ -14,3 +14,7 @@ export let INPUTS: {[name: string]: InputFeature} = {
   "sinX": {f: (x, y) => Math.sin(x), label: "sin(X_1)"},
   "sinY": {f: (x, y) => Math.sin(y), label: "sin(X_2)"},
 };
+
+export const DENSITY = 100;
+
+export let xDomain: [number, number] = [-6, 6];

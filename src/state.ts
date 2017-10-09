@@ -23,9 +23,6 @@ export const enum Mode {
   AddEdge,
 }
 
-
-
-
 /** Suffix added to the state when storing if a control is hidden or not. */
 const HIDE_STATE_SUFFIX = "_hide";
 
@@ -288,3 +285,5 @@ export class State {
     this[name + HIDE_STATE_SUFFIX] = hidden;
   }
 }
+
+export let state = State.deserializeState();

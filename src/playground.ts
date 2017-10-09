@@ -16,7 +16,7 @@ limitations under the License.
 import * as nn from "./nn";
 import {HeatMap, reduceMatrix} from "./heatmap";
 import {
-  State,
+  state,
   datasets,
   regDatasets,
   activations,
@@ -34,7 +34,7 @@ import {
   setNetwork,
   selectedNodeId,
 } from "./network_draw"
-import {INPUTS} from "./common";
+import {INPUTS, DENSITY, xDomain} from "./common";
 
 let mainWidth;
 
@@ -58,7 +58,7 @@ function scrollTween(offset) {
 
 const NUM_SAMPLES_CLASSIFY = 500;
 const NUM_SAMPLES_REGRESS = 1200;
-export const DENSITY = 100;
+
 
 let HIDABLE_CONTROLS = [
   ["Show test data", "showTestData"],
@@ -125,8 +125,6 @@ class Player {
   }
 }
 
-export let state = State.deserializeState();
-
 // Filter out inputs that are hidden.
 state.getHiddenProps().forEach(prop => {
   if (prop in INPUTS) {
@@ -137,7 +135,6 @@ state.getHiddenProps().forEach(prop => {
 export let boundary: {[id: string]: number[][]} = {};
 
 // Plot the heatmap.
-export let xDomain: [number, number] = [-6, 6];
 export let heatMap =
   new HeatMap(300, DENSITY, xDomain, xDomain, d3.select("#heatmap"),
         {showAxes: true});
