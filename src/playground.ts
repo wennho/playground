@@ -25,13 +25,13 @@ import {
   getKeyFromValue,
   Problem,
   Mode,
+  n,
+  setNetwork,
 } from "./state";
 import {Example2D, shuffle} from "./dataset";
 import {AppendingLineChart} from "./linechart";
 import {
   drawNetwork,
-  n,
-  setNetwork,
   selectedNodeId,
 } from "./network_draw"
 import {INPUTS, DENSITY, xDomain} from "./common";

@@ -286,3 +286,8 @@ export class State {
 }
 
 export let state = State.deserializeState();
+
+export let n: nn.Network = null;
+export function setNetwork(network:nn.Network) {
+  n = network;
+}

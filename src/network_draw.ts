@@ -3,14 +3,9 @@ import {reset, updateUI, updateDecisionBoundary, heatMap, boundary} from "./play
 import {HeatMap} from "./heatmap";
 import {ElementType, ElementUI, NetworkUI, RECT_SIZE} from "./network_ui";
 import {INPUTS, DENSITY, xDomain} from "./common";
-import {Mode, state} from "./state";
+import {Mode, state, n} from "./state";
 
 const BIAS_SIZE = 5;
-
-export let n: nn.Network = null;
-export function setNetwork(network:nn.Network) {
-  n = network;
-}
 
 function d3update(n: nn.Network) {
 
