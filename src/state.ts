@@ -147,7 +147,6 @@ export class State {
   noise = 0;
   batchSize = 10;
   discretize = false;
-  tutorial: string = null;
   percTrainData = 50;
   activation = nn.Activations.TANH;
   regularization: nn.RegularizationFunction = null;
