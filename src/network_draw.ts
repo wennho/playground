@@ -511,20 +511,17 @@ function selectNode(div, node : nn.Node) {
     let fromNode;
     let toNode;
 
-    if (selectedNodeLayer == nodeLayer || selectedNode.isLinked(node)) {
-
-      // check for a case where one of the nodes has no inputs. Then we can create a link.
-      if (selectedNode.inputLinks.length == 0 && node.inputLinks.length > 0) {
-        fromNode = node;
-        toNode = selectedNode;
-      } else if (node.inputLinks.length == 0 && selectedNode.inputLinks.length > 0) {
-        fromNode = selectedNode;
-        toNode = node;
-      } else {
-        // too bad, it is invalid
-        d3.select('#info').text('Cannot create link. Invalid target.');
-        return;
-      }
+    // check for a case where one of the nodes has no inputs. Then we always create a link to the orphan.
+    if (selectedNode.inputLinks.length == 0 && node.inputLinks.length > 0) {
+      fromNode = node;
+      toNode = selectedNode;
+    } else if (node.inputLinks.length == 0 && selectedNode.inputLinks.length > 0) {
+      fromNode = selectedNode;
+      toNode = node;
+    } else if (selectedNodeLayer == nodeLayer || selectedNode.isLinked(node)) {
+      // too bad, it is invalid
+      d3.select('#info').text('Cannot create link. Invalid target.');
+      return;
     } else {
       fromNode = selectedNodeLayer < nodeLayer ? selectedNode : node;
       toNode = selectedNodeLayer > nodeLayer ? selectedNode : node;

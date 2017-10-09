@@ -258,12 +258,11 @@ export class Network {
       toVisit = this.assignLayers(id2layer, newNetwork);
       let outputNodeID=this.getOutputNode().id;
 
-      // ensure orphaned nodes are always at the highest layer,
-      // but also check that there are no empty intermediate layers.
-      // if the output node has been assigned a layer, place orphaned nodes at an optimal level
+      // place orphaned nodes at an optimal level
+      // if the output node has been assigned a layer, place them at level 1 because it's too difficult to figure out the right layer
       // otherwise, place it at the next higher layer that hasn't been assigned
       if (id2layer.hasOwnProperty(outputNodeID)) {
-        currentLayer = id2layer[outputNodeID];
+        currentLayer = 1;
       }
     }
 
