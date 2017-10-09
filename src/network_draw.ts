@@ -15,7 +15,67 @@ function d3update(n: nn.Network) {
   let width = co.offsetLeft - cf.offsetLeft;
 
   let netUI = new NetworkUI(n, width);
+  d3updateLinks(netUI);
   d3updateNodes(netUI);
+}
+
+interface LinkData {
+  link : nn.Link,
+  sourceEle : ElementUI,
+  destEle : ElementUI,
+  linkEle : ElementUI,
+}
+
+function d3updateLinks(netUI:NetworkUI){
+
+  let numLayers = n.network.length;
+  let linkList : LinkData[] = [];
+
+  // Draw links.
+  for (let layerIdx = 1; layerIdx < numLayers ; layerIdx++) {
+    let numNodes = n.network[layerIdx].length;
+    for (let i = 0; i < numNodes; i++) {
+      let node = n.network[layerIdx][i];
+      for (let j = 0; j < node.inputLinks.length; j++) {
+        let l = node.inputLinks[j];
+        linkList.push({
+          link : l,
+          sourceEle : netUI.id2elem[l.source.id],
+          destEle : netUI.id2elem[l.dest.id],
+          linkEle : netUI.id2elem[l.id],
+        });
+      }
+    }
+  }
+
+  // JOIN new data with old elements.
+  let links = d3.select("g.core")
+    .selectAll("g.link")
+    .data(linkList, function (d) {
+      return d.link.id;
+    });
+
+  // UPDATE
+  // shift existing nodes to their new positions
+
+
+  // ENTER
+  // Create new elements as needed.
+  links.enter()
+    .insert("g")
+    .classed("link", true)
+    .style("opacity", 0)
+    .each(drawLink)
+    .transition()
+    .duration(500)
+    .style("opacity", 1);
+
+  // EXIT
+  // Remove old elements as needed.
+  links.exit()
+    .transition()
+    .style("opacity", 1e-6)
+    .remove();
 }
 
 function d3updateNodes(netUI:NetworkUI){
@@ -90,8 +150,6 @@ export function drawNetwork(n: nn.Network): void {
   let network: nn.Node[][] = n.network;
   let svg = d3.select("#svg");
   // Remove all svg elements.
-  svg.select("g.core").selectAll("path").remove();
-  // Remove all div elements.
   d3.select("#network").selectAll("div.plus-minus-neurons").remove();
 
   // Get the width of the svg container.
@@ -101,9 +159,9 @@ export function drawNetwork(n: nn.Network): void {
   let width = co.offsetLeft - cf.offsetLeft;
   svg.attr("width", width);
 
-  let container = svg.select("g.core");
-  if (container.empty()){
-    container = svg.append("g")
+
+  if (svg.select("g.core").empty()){
+    svg.append("g")
       .classed("core", true)
       .attr("transform", `translate(${padding},${padding})`)
   }
@@ -129,24 +187,10 @@ export function drawNetwork(n: nn.Network): void {
   }
   addLayerControl(numLayers-1,layerScale(numLayers-2) + 40);
 
-
-  // Draw links.
-  for (let layerIdx = 1; layerIdx < numLayers - 1; layerIdx++) {
-    let numNodes = network[layerIdx].length;
-    for (let i = 0; i < numNodes; i++) {
-      let node = network[layerIdx][i];
-      for (let j = 0; j < node.inputLinks.length; j++) {
-        let link = node.inputLinks[j];
-        drawLink(link, netUI, container).node() as any;
-      }
-    }
-  }
-
   // Draw the intermediate layer controls. Draw this after links so that it is on top
   for (let layerIdx = 1; layerIdx < numLayers - 1; layerIdx++) {
     addPlusMinusControl(layerScale(layerIdx), layerIdx, n);
   }
-
 
   // Output node is drawn separately
   let node = network[numLayers - 1][0];
@@ -156,12 +200,6 @@ export function drawNetwork(n: nn.Network): void {
       selectNode(d3.select('#heatmap'), node);
     }
   });
-
-  // Draw links to output.
-  for (let i = 0; i < node.inputLinks.length; i++) {
-    let link = node.inputLinks[i];
-    drawLink(link, netUI, container);
-  }
 
   // Adjust the height of the svg.
   svg.attr("height", netUI.maxY);
@@ -327,21 +365,22 @@ function calculateOffset(index, length) {
   return ((index - (length - 1) / 2) / length) * 12;
 }
 
-function drawLink(
-  link: nn.Link, netUI: NetworkUI,
-  container: d3.Selection<any>, animate=false) {
+function drawLink(d:LinkData) {
+
+
+  let container = d3.select(this);
+  let link = d.link;
   let line = container.insert("path", ":first-child");
-  let source = netUI.id2elem[link.source.id];
-  let dest = netUI.id2elem[link.dest.id];
+  let source = d.sourceEle;
+  let dest = d.destEle;
   let offset = RECT_SIZE * 1.2;
   let dPath = null;
 
-  let destInputLinks = netUI.id2elem[link.dest.id].links;
+  let destInputLinks = dest.links;
   let indexBeforeDest = destInputLinks.indexOf(link.id);
   let destOffset = calculateOffset(indexBeforeDest, destInputLinks.length);
 
   if (!link.isLong) {
-
     let datum = {
       source: {
         y: source.cx + RECT_SIZE / 2 + 2,
@@ -365,7 +404,7 @@ function drawLink(
 
     // draw the middle
     for (let i = link.sourceLayer()+1; i < link.destLayer(); i++) {
-      let linkEle = netUI.id2elem[link.id][i];
+      let linkEle = d.linkEle[i];
 
       let intermediateOffset = calculateOffset(linkEle.links.indexOf(link.id),linkEle.links.length);
 
