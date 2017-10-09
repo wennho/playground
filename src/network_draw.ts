@@ -250,7 +250,7 @@ export class NetworkUI {
   }
 }
 
-export function update(n: nn.Network){
+export function d3update(n: nn.Network){
 
   // Get the width of the svg container.
   let co = d3.select(".column.output").node() as HTMLDivElement;
@@ -264,6 +264,11 @@ export function update(n: nn.Network){
     d3.select("#network")
     .selectAll("div.canvas")
     .data(netUI.nodes, function (d) { return d.id;});
+  let svgNodes =
+    d3.select("g.core")
+      .selectAll("g.node")
+      .data(netUI.nodes, function (d) { return d.id;});
+
 
   // UPDATE
   // shift existing nodes to their new positions
@@ -276,12 +281,25 @@ export function update(n: nn.Network){
       let y = d.cy - RECT_SIZE / 2;
       return `${y + 3}px`;
     });
+  svgNodes.transition()
+    .attr("transform", function(d){
+      let x = d.cx - RECT_SIZE / 2;
+      let y = d.cy - RECT_SIZE / 2;
+      return `translate(${x},${y})`;
+    });
 
   // ENTER
   // Create new elements as needed.
   canvasNodes.enter().insert("div", ":first-child")
     .style("opacity", 1e-6)
     .each(drawNodeCanvas)
+    .transition()
+    .duration(500)
+    .style("opacity", 1);
+
+  svgNodes.enter().insert("g")
+    .style("opacity", 1e-6)
+    .each(drawNode)
     .transition()
     .duration(500)
     .style("opacity", 1);
@@ -299,6 +317,10 @@ export function update(n: nn.Network){
     .style("opacity", 1e-6)
     .remove();
 
+  svgNodes.exit()
+    .transition()
+    .style("opacity", 1e-6)
+    .remove();
 }
 
 
@@ -308,7 +330,7 @@ export function drawNetwork(n: nn.Network): void {
   let network: nn.Node[][] = n.network;
   let svg = d3.select("#svg");
   // Remove all svg elements.
-  svg.select("g.core").remove();
+  svg.select("g.core").selectAll("path").remove();
   // Remove all div elements.
   d3.select("#network").selectAll("div.plus-minus-neurons").remove();
 
@@ -319,9 +341,13 @@ export function drawNetwork(n: nn.Network): void {
   let width = co.offsetLeft - cf.offsetLeft;
   svg.attr("width", width);
 
-  let container = svg.append("g")
-    .classed("core", true)
-    .attr("transform", `translate(${padding},${padding})`);
+  let container = svg.select("g.core");
+  if (container.empty()){
+    container = svg.append("g")
+      .classed("core", true)
+      .attr("transform", `translate(${padding},${padding})`)
+  }
+
   // Draw the network layer by layer.
   let numLayers = n.network.length;
   let featureWidth = 118;
@@ -333,12 +359,6 @@ export function drawNetwork(n: nn.Network): void {
   let calloutThumb = d3.select(".callout.thumbnail").style("display", "none");
   let calloutWeights = d3.select(".callout.weights").style("display", "none");
   let netUI = new NetworkUI(n,width);
-
-  // Draw the input layer separately.
-  let nodeIds = Object.keys(INPUTS);
-  nodeIds.forEach((nodeId, i) => {
-    drawNode(netUI, nodeId, true, container);
-  });
 
   // add control for layers
   d3.selectAll(".plus-minus-layers").remove();
@@ -362,14 +382,9 @@ export function drawNetwork(n: nn.Network): void {
     }
   }
 
-  // Draw the intermediate layers. Draw this after links so that it is on top
+  // Draw the intermediate layer controls. Draw this after links so that it is on top
   for (let layerIdx = 1; layerIdx < numLayers - 1; layerIdx++) {
-    let numNodes = network[layerIdx].length;
     addPlusMinusControl(layerScale(layerIdx), layerIdx, n);
-    for (let i = 0; i < numNodes; i++) {
-      let node = network[layerIdx][i]
-      drawNode(netUI, node.id, false, container, node);
-    }
   }
 
 
@@ -399,7 +414,7 @@ export function drawNetwork(n: nn.Network): void {
   );
   d3.select(".column.features").style("height", height + "px");
 
-  update(n);
+  d3update(n);
 }
 
 function getRelativeHeight(selection: d3.Selection<any>) {
@@ -763,19 +778,18 @@ function drawNodeCanvas(d : ElementUI){
 
 
 
-function drawNode(netUI:NetworkUI, nodeId: string, isInput: boolean,
-                  container: d3.Selection<any>, node?: nn.Node, animate=false) {
-  let element = netUI.id2elem[nodeId];
-  let x = element.cx - RECT_SIZE / 2;
-  let y = element.cy - RECT_SIZE / 2;
+function drawNode(d:ElementUI) {
 
-  let nodeGroup = container.append("g")
-    .attr({
-      "class": "node",
-      "id": `node${nodeId}`,
-      "transform": `translate(${x},${y})`,
-      "opacity": 0,
-    });
+  let x = d.cx - RECT_SIZE / 2;
+  let y = d.cy - RECT_SIZE / 2;
+
+  let nodeGroup = d3.select(this);
+
+  nodeGroup.attr({
+    "class": "node",
+    "id": `node-${d.id}`,
+    "transform": `translate(${x},${y})`,
+  });
 
   // Draw the main rectangle.
   nodeGroup.append("rect")
@@ -785,11 +799,11 @@ function drawNode(netUI:NetworkUI, nodeId: string, isInput: boolean,
       width: RECT_SIZE,
       height: RECT_SIZE,
     });
-  let activeOrNotClass = state[nodeId] ? "active" : "inactive";
+  let activeOrNotClass = state[d.id] ? "active" : "inactive";
 
-  if (isInput) {
-    let label = INPUTS[nodeId].label != null ?
-      INPUTS[nodeId].label : nodeId;
+  if (d.isInput) {
+    let label = INPUTS[d.id].label != null ?
+      INPUTS[d.id].label : d.id;
     // Draw the input label.
     let text = nodeGroup.append("text").attr({
       class: "main-label",
@@ -823,7 +837,7 @@ function drawNode(netUI:NetworkUI, nodeId: string, isInput: boolean,
     nodeGroup.classed(activeOrNotClass, true);
   }
 
-  if (!isInput) {
+  if (!d.isInput) {
     // draw the option labels
     let text = nodeGroup.append("text").attr({
       class: "option-label",
@@ -833,7 +847,7 @@ function drawNode(netUI:NetworkUI, nodeId: string, isInput: boolean,
     });
     text.append("tspan").text('Remove');
     text.on("click", function() {
-      n.removeNode(node);
+      n.removeNode(n.id2node[d.id]);
       reset();
     });
     text.style("cursor", "pointer");
@@ -841,7 +855,7 @@ function drawNode(netUI:NetworkUI, nodeId: string, isInput: boolean,
 
     let errorText = nodeGroup.append("text").attr({
       class: "option-label",
-      id: `error-${nodeId}`,
+      id: `error-${d.id}`,
       x: RECT_SIZE + 7,
       y: RECT_SIZE - 4,
       "text-anchor": "start"
@@ -851,23 +865,16 @@ function drawNode(netUI:NetworkUI, nodeId: string, isInput: boolean,
     // Draw the node's bias.
     nodeGroup.append("rect")
       .attr({
-        id: `bias-${nodeId}`,
+        id: `bias-${d.id}`,
         x: -BIAS_SIZE - 2,
         y: RECT_SIZE - BIAS_SIZE + 3,
         width: BIAS_SIZE,
         height: BIAS_SIZE,
       }).on("mouseenter", function() {
-      updateHoverCard(ElementType.NODE, node, d3.mouse(container.node()));
+      updateHoverCard(ElementType.NODE, n.id2node[d.id], d3.mouse(nodeGroup.node().parentNode));
     }).on("mouseleave", function() {
       updateHoverCard(null);
     });
-  }
-
-  // done with nodegroup data. Can render now
-  if (animate) {
-    nodeGroup.transition().style("opacity",1);
-  } else {
-    nodeGroup.style("opacity",1);
   }
 
 }
