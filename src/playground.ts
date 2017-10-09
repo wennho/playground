@@ -23,22 +23,22 @@ import {
   problems,
   regularizations,
   getKeyFromValue,
-  Problem
+  Problem,
+  Mode,
 } from "./state";
 import {Example2D, shuffle} from "./dataset";
 import {AppendingLineChart} from "./linechart";
 import {
-  Mode,
-  INPUTS,
   drawNetwork,
   n,
   setNetwork,
   selectedNodeId,
 } from "./network_draw"
+import {INPUTS} from "./common";
 
 let mainWidth;
 
-export let mode = Mode.None;
+
 
 // More scrolling
 d3.select(".more button").on("click", function() {
@@ -248,11 +248,11 @@ function makeGUI() {
 
   d3.selectAll('input[name="mode"]').on("change", function() {
     if (this.value == 'deleteEdge') {
-      mode = Mode.DeleteEdge;
+      state.mode = Mode.DeleteEdge;
     } else if (this.value == 'addEdge') {
-      mode = Mode.AddEdge;
+      state.mode = Mode.AddEdge;
     } else {
-      mode = Mode.None;
+      state.mode = Mode.None;
     }
 
   });

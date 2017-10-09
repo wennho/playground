@@ -16,6 +16,16 @@ limitations under the License.
 import * as nn from "./nn";
 import * as dataset from "./dataset";
 
+
+export const enum Mode {
+  None,
+  DeleteEdge,
+  AddEdge,
+}
+
+
+
+
 /** Suffix added to the state when storing if a control is hidden or not. */
 const HIDE_STATE_SUFFIX = "_hide";
 
@@ -161,6 +171,7 @@ export class State {
   dataset: dataset.DataGenerator = dataset.classifyCircleData;
   regDataset: dataset.DataGenerator = dataset.regressPlane;
   seed: string;
+  mode = Mode.None;
 
   /**
    * Deserializes the state from the url hash.

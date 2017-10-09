@@ -1,34 +1,13 @@
 import * as nn from "./nn";
-import {mode, reset, state, updateUI, DENSITY, xDomain, updateDecisionBoundary, heatMap, boundary} from "./playground"
+import {reset, state, updateUI, DENSITY, xDomain, updateDecisionBoundary, heatMap, boundary} from "./playground"
 import {HeatMap} from "./heatmap";
+import {ElementType, ElementUI, NetworkUI, RECT_SIZE} from "./network_ui";
+import {INPUTS} from "./common";
+import {Mode} from "./state";
 
-const RECT_SIZE = 30;
 const BIAS_SIZE = 5;
 
-enum ElementType {
-  NODE, LINK
-}
 
-export interface InputFeature {
-  f: (x: number, y: number) => number;
-  label?: string;
-}
-
-export let INPUTS: {[name: string]: InputFeature} = {
-  "x": {f: (x, y) => x, label: "X_1"},
-  "y": {f: (x, y) => y, label: "X_2"},
-  "xSquared": {f: (x, y) => x * x, label: "X_1^2"},
-  "ySquared": {f: (x, y) => y * y,  label: "X_2^2"},
-  "xTimesY": {f: (x, y) => x * y, label: "X_1X_2"},
-  "sinX": {f: (x, y) => Math.sin(x), label: "sin(X_1)"},
-  "sinY": {f: (x, y) => Math.sin(y), label: "sin(X_2)"},
-};
-
-export const enum Mode {
-  None,
-  DeleteEdge,
-  AddEdge,
-}
 
 export let n: nn.Network = null;
 export function setNetwork(network:nn.Network) {
@@ -36,228 +15,23 @@ export function setNetwork(network:nn.Network) {
 }
 
 
-class ElementUI {
-  id: string;
-  type:ElementType;
-  links: string[] = [];
-  cx :number;
-  cy : number;
-  isInput: boolean = false;
-
-  constructor (id:string, type:ElementType, links:string[]) {
-    this.id = id;
-    this.type = type;
-    this.links = links;
-  }
-}
 
 
-export class NetworkUI {
-
-  layout : ElementUI[][];
-  nodeId2layer :{[id:string] : number} = {};
-  id2pos : {[id:string] : any} = {};
-  id2elem : {[id:string] : any} = {};
-  maxY : number;
-  nodes : ElementUI[] = [];
-
-  updateNodeList() {
-    for (let i=0; i<this.layout.length;i++) {
-      for (let j=0; j<this.layout[i].length;j++) {
-        let ele = this.layout[i][j];
-        if (ele.type == ElementType.NODE) {
-          this.nodes.push(this.layout[i][j]);
-        }
-      }
-    }
-  }
-
-  // update the id2elem and id2pos mappings
-  updateMapping() {
-    this.layout.forEach( function (layer, layerIdx) {
-      layer.forEach(function (element, index) {
-        this.nodeId2layer[element.id] = layerIdx;
-        if (element.type == ElementType.NODE) {
-          this.id2elem[element.id] = element;
-          this.id2pos[element.id] = index;
-        } else {
-          element.links.forEach((linkId) => {
-
-            if (!this.id2elem.hasOwnProperty(linkId)){
-              this.id2elem[linkId] = {};
-            }
-            this.id2elem[linkId][layerIdx] = element;
-
-            if (!this.id2pos.hasOwnProperty(linkId)){
-              this.id2pos[linkId] = {};
-            }
-            this.id2pos[linkId][layerIdx] = index;
-
-          }, this);
-        }
-      }, this);
-    }, this);
-  }
-
-
-  getPosInLayer(link: nn.Link, layer:number) {
-
-    if (this.nodeId2layer[link.source.id] == layer) {
-      return this.id2pos[link.source.id];
-    } else if (this.nodeId2layer[link.dest.id] == layer) {
-      return this.id2pos[link.dest.id];
-    }
-
-    return this.id2pos[link.id][layer];
-  }
-
-  // recursive function to determine link ordering
-  compareOrder(a, b, layer) {
-
-    if (layer < 0 && a.dest.id != b.dest.id) {
-      let compLayer = Math.min(this.nodeId2layer[a.dest.id], this.nodeId2layer[b.dest.id]);
-      return this.compareOrder(a,b,compLayer);
-    }
-
-    if (layer < 0) throw new Error('recursion failed');
-
-    let posA = this.getPosInLayer(a,layer);
-    let posB = this.getPosInLayer(b,layer);
-
-    if (posA != posB) return posA - posB;
-    else return this.compareOrder(a,b,layer-1);
-
-  }
-
-  // sort the link ordering that goes to each element
-  updateOrdering(){
-    for (let i=1; i<this.layout.length; i++) {
-
-      this.layout[i].forEach(function (element, index) {
-        element.links.sort((a,b)=>{
-
-          let linkA = nn.Link.id2Link[a];
-          let linkB = nn.Link.id2Link[b];
-
-          return this.compareOrder(linkA, linkB, i-1);
-
-        });
-      }, this);
-    }
-  }
-
-  constructor (n: nn.Network, width:number, oldNetUI?:NetworkUI) {
-
-    // Draw the network layer by layer.
-    let numLayers = n.network.length;
-    let featureWidth = 118;
-    let layerScale = d3.scale.ordinal<number, number>()
-      .domain(d3.range(1, numLayers - 1))
-      .rangePoints([featureWidth, width - RECT_SIZE], 0.7);
-    let nodeIndexScale = (nodeIndex: number) => nodeIndex * (RECT_SIZE + 25);
-
-
-    // create basic layout
-    this.layout = n.network.map((layer, layerIdx) => {
-
-      // do input layer separately
-      if (layerIdx == 0 ) {
-        return Object.keys(INPUTS).map((nodeId) => {
-          let ele = new ElementUI(nodeId, ElementType.NODE, []);
-          ele.isInput = true;
-          return ele;
-        });
-      }
-
-      return layer.map((node) => {
-        let links = node.inputLinks.map((l)=>l.id);
-        return new ElementUI(node.id, ElementType.NODE, links);
-      });
-    });
-    this.updateMapping();
-
-    // insert long links
-    let posToAdd : any[] = this.layout.map(()=>{ return {}; });
-    for (let j=0; j<n.longLinks.length; j++){
-      let link = n.longLinks[j];
-      let sourcePos = this.id2pos[link.source.id];
-      let destPos = this.id2pos[link.dest.id];
-      let pos = Math.round((sourcePos + destPos)/2);
-      for (let i = link.sourceLayer()+1; i < link.destLayer(); i++) {
-        if (!posToAdd[i].hasOwnProperty(pos)) {
-          posToAdd[i][pos] = [];
-        }
-        posToAdd[i][pos].push(link);
-      }
-    }
-
-
-    posToAdd.forEach(function (v , layerIdx) {
-      if (Object.keys(v).length == 0) return;
-      let posList = Object.keys(v).sort();
-      posList.forEach((pos : string) => {
-        // pos is above all others. add elements until we reach the right pos
-        while  (!this.layout[layerIdx].hasOwnProperty(pos)) {
-            let newElement = new ElementUI(null, ElementType.LINK, []);
-            this.layout[layerIdx].push(newElement);
-        }
-        v[pos].forEach((link) => {
-          let element = this.layout[layerIdx][pos];
-          if (element.type == ElementType.LINK) {
-            element.links.push(link.id);
-          } else {
-            let newElement = new ElementUI(null, ElementType.LINK,[link.id]);
-            this.layout[layerIdx].splice(pos,0, newElement);
-          }
-        }, this);
-      }, this);
-    }, this);
-
-    this.updateMapping();
-    this.updateOrdering();
-
-    // calculate coords for intermediate layers
-    for (let layerIdx = 1; layerIdx < numLayers - 1; layerIdx++) {
-      let cx = layerScale(layerIdx) + RECT_SIZE / 2;
-      for (let i = 0; i < this.layout[layerIdx].length; i++) {
-        let element = this.layout[layerIdx][i];
-        element.cx = cx;
-        element.cy = nodeIndexScale(i) + RECT_SIZE / 2;
-      }
-    }
-
-    // calculate coords for input layers
-    let nodeIds = Object.keys(INPUTS);
-    let cx = RECT_SIZE / 2 + 50;
-    nodeIds.forEach((nodeId, i) => {
-      let cy = nodeIndexScale(i) + RECT_SIZE / 2;
-      if (!this.id2elem.hasOwnProperty(nodeId)) {
-        this.id2elem[nodeId] = new ElementUI(nodeId, ElementType.NODE,[]);
-      }
-      this.id2elem[nodeId].cx = cx;
-      this.id2elem[nodeId].cy = cy;
-    }, this);
-
-    // calculate coords for output layer
-    let node = n.network[numLayers - 1][0];
-    this.id2elem[node.id].cx = width + RECT_SIZE / 2;
-    this.id2elem[node.id].cy = nodeIndexScale(0) + RECT_SIZE / 2;
-
-    this.maxY = Math.max(...(this.layout.map((layer) => nodeIndexScale(layer.length))));
-    this.maxY = Math.max(this.maxY, nodeIndexScale(nodeIds.length));
-
-    this.updateNodeList();
-  }
-}
-
-export function d3update(n: nn.Network){
+function d3update(n: nn.Network) {
 
   // Get the width of the svg container.
   let co = d3.select(".column.output").node() as HTMLDivElement;
   let cf = d3.select(".column.features").node() as HTMLDivElement;
   let width = co.offsetLeft - cf.offsetLeft;
 
-  let netUI = new NetworkUI(n,width);
+  let netUI = new NetworkUI(n, width);
+  d3updateNodes(netUI);
+}
+
+
+
+
+function d3updateNodes(netUI:NetworkUI){
 
   // JOIN new data with old elements.
   let canvasNodes =
@@ -268,7 +42,6 @@ export function d3update(n: nn.Network){
     d3.select("g.core")
       .selectAll("g.node")
       .data(netUI.nodes, function (d) { return d.id;});
-
 
   // UPDATE
   // shift existing nodes to their new positions
@@ -392,7 +165,7 @@ export function drawNetwork(n: nn.Network): void {
   let node = network[numLayers - 1][0];
   // add click listener
   d3.select('#heatmap').on('click', function(){
-    if (mode == Mode.AddEdge) {
+    if (state.mode == Mode.AddEdge) {
       selectNode(d3.select('#heatmap'), node);
     }
   });
@@ -510,7 +283,7 @@ function updateHoverCard(type: ElementType, nodeOrLink?: nn.Node | nn.Link,
   // actions when the node or link is clicked
   d3.select("#svg").on("click", () => {
 
-    if (mode === Mode.DeleteEdge && nodeOrLink instanceof nn.Link) {
+    if (state.mode === Mode.DeleteEdge && nodeOrLink instanceof nn.Link) {
       n.removeLink(nodeOrLink);
       let hovercard = d3.select("#hovercard");
       hovercard.style("display", "none");
@@ -740,7 +513,7 @@ function drawNodeCanvas(d : ElementUI){
         state.discretize);
     })
     .on("click", function(){
-      if (mode == Mode.AddEdge) {
+      if (state.mode == Mode.AddEdge) {
         selectNode(div, n.id2node[d.id]);
       }
     });
@@ -748,7 +521,7 @@ function drawNodeCanvas(d : ElementUI){
   if (d.isInput) {
     div.on("click", function() {
 
-      if (mode == Mode.AddEdge) {
+      if (state.mode == Mode.AddEdge) {
         selectNode(div, n.findNode(d.id));
         return;
       }
