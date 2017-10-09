@@ -103,7 +103,7 @@ export class NetworkUI {
   updateOrdering(){
     for (let i=1; i<this.layout.length; i++) {
 
-      this.layout[i].forEach(function (element, index) {
+      this.layout[i].forEach(function (element) {
         element.links.sort((a,b)=>{
 
           let linkA = nn.Link.id2Link[a];
@@ -116,7 +116,7 @@ export class NetworkUI {
     }
   }
 
-  constructor (n: nn.Network, width:number, oldNetUI?:NetworkUI) {
+  constructor (n: nn.Network, width:number) {
 
     // Draw the network layer by layer.
     let numLayers = n.network.length;

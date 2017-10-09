@@ -127,7 +127,7 @@ function d3updateNodes(netUI:NetworkUI){
   // EXIT
   // Remove old elements as needed.
   canvasNodes.exit()
-    .each(function (d){
+    .each(function (){
       d3.select(this)
         .select("canvas.node-heat-map")
         // remove the class so that it's not called by heatmap.updateBackground
@@ -269,7 +269,7 @@ function addPlusMinusControl(x: number, layerIdx: number, n:nn.Network) {
       if (numNeurons >= 8) {
         return;
       }
-      let node = n.addNode(layerIdx);
+      n.addNode(layerIdx);
       reset(false);
     })
     .append("i")
@@ -309,7 +309,7 @@ function updateHoverCard(type: ElementType, nodeOrLink?: nn.Node | nn.Link,
   d3.select("#svg").on("click", () => {
 
     if (state.mode === Mode.DeleteEdge && nodeOrLink instanceof nn.Link) {
-      n.removeLink(nodeOrLink);
+      n.removeLink(nodeOrLink, true);
       let hovercard = d3.select("#hovercard");
       hovercard.style("display", "none");
       d3.select("#svg").on("click", null);
@@ -420,7 +420,7 @@ function generateLinkPath(d:LinkData) : string {
       dest.cy + destOffset
     ]);
 
-    var lineFunction = d3.svg.line()
+    let lineFunction = d3.svg.line()
       .x(function(d) { return d[0]; })
       .y(function(d) { return d[1]; })
       .interpolate("basis");
@@ -463,14 +463,14 @@ function drawLink(d:LinkData) {
   // back-most line to show error rate
   line.attr({
     "d" : dPath,
-    class: "errorlink",
+    "class": "errorlink",
     id: "errorline" + link.source.id + "-" + link.dest.id,
   });
 
   // line to show weights
   container.append("path").attr({
     "marker-start": "url(#markerArrow)",
-    class: "link",
+    "class": "link",
     id: "link" + link.source.id + "-" + link.dest.id,
     d: dPath
   });
@@ -629,7 +629,7 @@ function drawNode(d:ElementUI) {
       INPUTS[d.id].label : d.id;
     // Draw the input label.
     let text = nodeGroup.append("text").attr({
-      class: "main-label",
+      "class": "main-label",
       x: -10,
       y: RECT_SIZE / 2,
       "text-anchor": "end"
@@ -663,7 +663,7 @@ function drawNode(d:ElementUI) {
   if (!d.isInput) {
     // draw the option labels
     let text = nodeGroup.append("text").attr({
-      class: "option-label",
+      "class": "option-label",
       x: 0,
       y: RECT_SIZE + 13,
       "text-anchor": "start"
@@ -677,7 +677,7 @@ function drawNode(d:ElementUI) {
 
 
     let errorText = nodeGroup.append("text").attr({
-      class: "option-label",
+      "class": "option-label",
       id: `error-${d.id}`,
       x: RECT_SIZE + 7,
       y: RECT_SIZE - 4,

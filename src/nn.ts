@@ -35,6 +35,7 @@ export class Network {
    *     for a given weight (parameter) in the network. If null, there will be
    *     no regularization.
    * @param inputIds List of ids for the input nodes.
+   * @param initZero
    */
   constructor(
       networkShape: number[], activation: ActivationFunction,
@@ -132,6 +133,8 @@ export class Network {
     } else {
       throw new Error ("cannot find node to remove");
     }
+
+    this.recomputeLayers();
   }
 
   findNode(nodeId: string) {
@@ -178,6 +181,7 @@ export class Network {
     }
   }
 
+  // assumes node2layer is accurate
   recomputeLongLinks() {
     this.longLinks = [];
     this.network.forEach((layer)=>{
@@ -191,13 +195,48 @@ export class Network {
     }, this);
   }
 
+  // assumes that input layers are on the first layer
   recomputeLayers() {
-    this.node2layer = {};
-    this.network.forEach((layer, layerIdx)=>{
-      layer.forEach((node)=>{
-        this.node2layer[node.id] = layerIdx;
-      }, this);
-    }, this);
+
+    let toVisit : Node[] = this.network[0];
+    let toVisitNext : Node[];
+    let currentLayer = 0;
+    let id2layer = {};
+    let newNetwork = [];
+
+    // assign layers via breadth-first traversal from input nodes
+    while (toVisit.length > 0) {
+
+      toVisitNext = [];
+      for (let i=0; i<toVisit.length;i++) {
+        let node = toVisit[i];
+        // this will also overwrite the last value. Since currentLayer always increases, this is the correct behaviour.
+        id2layer[node.id] = currentLayer;
+        node.outputs.forEach((link : Link)=>{
+          toVisitNext.push(link.dest);
+        });
+      }
+      newNetwork.push([]);
+      toVisit = toVisitNext;
+      currentLayer++;
+      if (currentLayer > 10) {
+        throw new Error("Too many layers");
+      }
+    }
+
+    // populate new network layers, using the old network as reference for ordering
+
+    for (let i=0; i<this.network.length; i++){
+      let layer = this.network[i];
+      for (let j=0; j<layer.length;j++) {
+        let node = layer[j];
+        newNetwork[id2layer[node.id]].push(node);
+      }
+    }
+
+    this.node2layer = id2layer;
+    this.network = newNetwork;
+
     this.recomputeLongLinks();
   }
 
@@ -212,9 +251,9 @@ export class Network {
 
   }
 
-  removeLink(link:Link) {
+  removeLink(link:Link, recomputeLayers = false) {
 
-    if (link.isLong) {
+    if (link.isLong()) {
       this.longLinks = this.longLinks.filter(function(x) {return x.id !== link.id; });
     }
 
@@ -230,6 +269,10 @@ export class Network {
     node.inputLinks = node.inputLinks.filter(function(x) {return x.id !== link.id });
     if (node.inputLinks.length !== origLength -1 ) {
       throw new Error('Unable to remove input node - node not found');
+    }
+
+    if (recomputeLayers) {
+      this.recomputeLayers();
     }
   }
 
@@ -321,10 +364,8 @@ export class Node {
       return true;
     }
     index = this.inputLinks.map(function(x) {return x.source.id; }).indexOf(node.id);
-    if (index > -1) {
-      return true;
-    }
-    return false;
+    return index > -1;
+
   }
 }
 
@@ -440,6 +481,7 @@ export class Link {
    * @param dest The destination node.
    * @param regularization The regularization function that computes the
    *     penalty for this weight. If null, there will be no regularization.
+   * @param n The network
    */
   constructor(source: Node, dest: Node,
       regularization: RegularizationFunction, n:Network) {

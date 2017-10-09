@@ -347,13 +347,13 @@ function makeGUI() {
   }
 }
 
-function updateNodeErrorUI(network: nn.Node[][]) {
+function updateNodeErrorUI() {
     n.forEachNode(true, node => {
         d3.select(`text#error-${node.id}`).text('Error: ' + (node.error*100).toPrecision(3));
     });
 }
 
-function updateBiasesUI(network: nn.Node[][]) {
+function updateBiasesUI() {
   n.forEachNode(true, node => {
     d3.select(`rect#bias-${node.id}`).style("fill", colorScale(node.bias));
   });
@@ -451,9 +451,9 @@ export function updateUI(firstStep = false) {
   // Update the links visually.
   updateWeightsUI(n.network, d3.select("g.core"));
   // Update the bias values visually.
-  updateBiasesUI(n.network);
+  updateBiasesUI();
   // Update node errors visually
-  updateNodeErrorUI(n.network);
+  updateNodeErrorUI();
   // Get the decision boundary of the network.
   updateDecisionBoundary(n.network, firstStep);
   let selectedId = selectedNodeId != null ?
@@ -559,7 +559,7 @@ export function reset(onStartup=false) {
   drawNetwork(n);
 
   updateUI(true);
-};
+}
 
 function drawDatasetThumbnails() {
   function renderThumbnail(canvas, dataGenerator) {
@@ -615,7 +615,7 @@ function hideControls() {
     let input = label.append("input")
       .attr({
         type: "checkbox",
-        class: "mdl-checkbox__input",
+        "class": "mdl-checkbox__input",
       });
     if (hiddenProps.indexOf(id) === -1) {
       input.attr("checked", "true");
