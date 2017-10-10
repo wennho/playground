@@ -549,7 +549,7 @@ export function reset(onStartup=false) {
       setNetwork(new nn.Network(shape, state.activation, outputActivation,
           state.regularization, constructInputIds(), state.initZero));
   }
-  
+
   let numHiddenLayers = n.network.length - 2;
   let suffix = numHiddenLayers !== 1 ? "s" : "";
   d3.select("#layers-label").text("Hidden layer" + suffix);

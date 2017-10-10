@@ -215,16 +215,13 @@ export class Network {
     return newNetwork;
   }
 
-  // assumes that input layers are on the first layer
-  recomputeLayers() {
+  calcLayersViaPropagation(toVisit, isForward){
 
     let id2layer = {};
-    let toVisit : Node[] = [];
-    this.network[0].forEach((node)=>{
-      id2layer[node.id] = 0;
-      toVisit.push(node); // do not have a direct assign as it will get popped later
-    });
     let iter = 0;
+    toVisit.forEach((node)=>{
+      id2layer[node.id] = 0;
+    });
 
     // assign layers via propagation from input nodes
     // breadth-first traversal is not suitable because there could be back-linkages that need extra layers
@@ -235,11 +232,21 @@ export class Network {
 
       node.inputLinks.forEach((l: Link) => {
         if (!id2layer.hasOwnProperty(l.source.id)) {
-          id2layer[l.source.id] = nodeLayer-1;
-          if (nodeLayer <= 0) throw new Error ("cannot have negative layers");
+
+          if (isForward && nodeLayer == 1) {
+            // cannot push back. we upgrade this node instead
+            id2layer[l.source.id] = nodeLayer;
+            id2layer[node.id] += 1;
+            nodeLayer = id2layer[node.id];
+
+          } else {
+            id2layer[l.source.id] = nodeLayer-1;
+          }
+
           toVisit.push(l.source);
+
         } else if (id2layer[l.source.id] >= nodeLayer) {
-           // we need to further upgrade this node
+          // we need to further upgrade this node
           nodeLayer = id2layer[l.source.id]+1;
           id2layer[node.id] = nodeLayer;
         }
@@ -256,8 +263,50 @@ export class Network {
       if (iter > 100) throw new Error ('too many iterations! cannot converge');
     }
 
+    return id2layer;
+  }
 
-    // also traverse from output node, to look for orphaned nodes
+  // assumes that input layers are on the first layer
+  recomputeLayers() {
+
+
+    let toVisit : Node[] = [];
+    this.network[0].forEach((node)=>{
+      toVisit.push(node); // do not have a direct assign as it will get popped later
+    });
+
+    let id2layer = this.calcLayersViaPropagation(toVisit,true);
+
+    if (!id2layer.hasOwnProperty(this.getOutputNode().id)){
+      // the network is not connected.
+
+      let forwardMax = Math.max.apply(null,Object.keys(id2layer).map(key=>id2layer[key]));
+
+      let backId2Layer = this.calcLayersViaPropagation([this.getOutputNode()],false);
+      let backwardMin = Math.min.apply(null,Object.keys(backId2Layer).map(key=>backId2Layer[key]));
+
+      let totalLayers = Math.max(forwardMax,-backwardMin);
+      if (forwardMax < totalLayers) {
+        let diff = totalLayers - forwardMax;
+        Object.keys(id2layer).forEach(key=>{
+          if (id2layer[key] != 0) id2layer[key] += diff;
+        })
+      }
+
+      Object.keys(backId2Layer).forEach(key=>{
+        id2layer[key] = backId2Layer[key]+totalLayers+1;
+      })
+
+    } else {
+      // make sure output is the only one at the top layer
+      let outputLayer = id2layer[this.getOutputNode().id];
+      for (let key in id2layer) {
+        if (id2layer[key] >= outputLayer && key != this.getOutputNode().id) {
+          outputLayer = id2layer[key] + 1;
+        }
+      }
+      id2layer[this.getOutputNode().id] = outputLayer;
+    }
 
 
     // populate new network layers, using the old network as reference for ordering
