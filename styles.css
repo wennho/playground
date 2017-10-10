@@ -816,6 +816,15 @@ g.column rect {
   margin-bottom: 5px;
 }
 
+
+#info {
+  position: absolute;
+  bottom: 10px;
+  margin: 0 auto;
+  left:50%;
+  transform: translateX(-50%);
+}
+
 /* Output column */
 
 .output.column {

@@ -13,7 +13,6 @@ function d3update(n: nn.Network) {
   let co = d3.select(".column.output").node() as HTMLDivElement;
   let cf = d3.select(".column.features").node() as HTMLDivElement;
   let width = co.offsetLeft - cf.offsetLeft;
-
   let netUI = new NetworkUI(n, width);
   d3updateLinks(netUI);
   d3updateNodes(netUI);
@@ -498,7 +497,9 @@ function selectNode(div, node : nn.Node) {
     selectedNode = node;
     selectedDiv = div;
     div.classed("selected", true);
-    d3.select('#info').text('Node ' + node.id + ' selected. Click on another node to create a link.');
+    d3.select('#info').html('Node ' + node.id + ' selected. Click on another node ' +
+      'to create a link from this node to that node if possible. <br />' +
+      'Otherwise, a link in the other direction is created');
   } else if (selectedNode.id == node.id) {
     selectedNode = null;
     selectedDiv = null;
@@ -506,25 +507,23 @@ function selectNode(div, node : nn.Node) {
     d3.select('#info').text('Node ' + node.id + ' unselected.');
   } else {
     // first check that link does not already exist
-    let selectedNodeLayer = n.node2layer[selectedNode.id];
-    let nodeLayer = n.node2layer[node.id];
+
     let fromNode;
     let toNode;
 
-    // check for a case where one of the nodes has no inputs. Then we always create a link to the orphan.
-    if (selectedNode.inputLinks.length == 0 && node.inputLinks.length > 0) {
-      fromNode = node;
-      toNode = selectedNode;
-    } else if (node.inputLinks.length == 0 && selectedNode.inputLinks.length > 0) {
+
+    if (selectedNode.isLinked(node)) {
+      d3.select('#info').text('Cannot create link. Link already exists.');
+      return;
+    } else if (selectedNode.willNotBeCycleIfLinkedTo(node)) {
       fromNode = selectedNode;
       toNode = node;
-    } else if (selectedNodeLayer == nodeLayer || selectedNode.isLinked(node)) {
-      // too bad, it is invalid
-      d3.select('#info').text('Cannot create link. Invalid target.');
-      return;
+    } else if (node.willNotBeCycleIfLinkedTo(selectedNode)) {
+      fromNode = node;
+      toNode = selectedNode;
     } else {
-      fromNode = selectedNodeLayer < nodeLayer ? selectedNode : node;
-      toNode = selectedNodeLayer > nodeLayer ? selectedNode : node;
+      d3.select('#info').text('Cannot create link. There will be a cycle.');
+      return;
     }
 
     n.addLink(fromNode, toNode);

@@ -195,9 +195,8 @@ export class Network {
   }
 
   // populate new network layers, using the old network as reference for ordering
-  // orphaned nodes are returned in an array
-  assignLayers(id2layer, newNetwork) {
-    let toVisit = [];
+  assignLayers(id2layer) {
+    let newNetwork = [];
     for (let i=0; i<this.network.length; i++){
       let layer = this.network[i];
       for (let j=0; j<layer.length;j++) {
@@ -209,66 +208,64 @@ export class Network {
           }
           newNetwork[layerIdx].push(node);
         } else {
-
-          if (node.inputLinks.length == 0) {
-            // this node has no inputs. Place it for visiting again.
-            toVisit.push(node);
-          }
+          throw new Error("there is still a node with no assigned layer");
         }
       }
     }
-    return toVisit;
+    return newNetwork;
   }
 
   // assumes that input layers are on the first layer
   recomputeLayers() {
 
-    let toVisit : Node[] = this.network[0];
-    let toVisitNext : Node[];
-    let currentLayer = 0;
     let id2layer = {};
-    let newNetwork;
+    let toVisit : Node[] = [];
+    this.network[0].forEach((node)=>{
+      id2layer[node.id] = 0;
+      toVisit.push(node); // do not have a direct assign as it will get popped later
+    });
+    let iter = 0;
 
-    // assign layers via breadth-first traversal from input nodes
+    // assign layers via propagation from input nodes
+    // breadth-first traversal is not suitable because there could be back-linkages that need extra layers
     while (toVisit.length > 0) {
+      let node = toVisit.pop();
 
-      while (toVisit.length > 0) {
-        toVisitNext = [];
-        for (let i = 0; i < toVisit.length; i++) {
-          let node = toVisit[i];
+      let nodeLayer = id2layer[node.id];
 
-          if (!id2layer.hasOwnProperty(node.id) || id2layer[node.id] < currentLayer) {
-            id2layer[node.id] = currentLayer;
-          }
-
-          node.outputs.forEach((link: Link) => {
-            toVisitNext.push(link.dest);
-          });
+      node.inputLinks.forEach((l: Link) => {
+        if (!id2layer.hasOwnProperty(l.source.id)) {
+          id2layer[l.source.id] = nodeLayer-1;
+          if (nodeLayer <= 0) throw new Error ("cannot have negative layers");
+          toVisit.push(l.source);
+        } else if (id2layer[l.source.id] >= nodeLayer) {
+           // we need to further upgrade this node
+          nodeLayer = id2layer[l.source.id]+1;
+          id2layer[node.id] = nodeLayer;
         }
-        toVisit = toVisitNext;
-        currentLayer++;
-        if (currentLayer > 10) {
-          throw new Error("Too many layers");
+      });
+
+      node.outputs.forEach((l: Link) => {
+        if (!id2layer.hasOwnProperty(l.dest.id) || id2layer[l.dest.id] <= nodeLayer) {
+          id2layer[l.dest.id] = nodeLayer+1;
+          toVisit.push(l.dest);
         }
-      }
+      });
 
-      newNetwork = [];
-      // populate new network layers, using the old network as reference for ordering
-      // orphaned nodes are returned in an array
-      toVisit = this.assignLayers(id2layer, newNetwork);
-      let outputNodeID=this.getOutputNode().id;
-
-      // place orphaned nodes at an optimal level
-      // if the output node has been assigned a layer, place them at level 1 because it's too difficult to figure out the right layer
-      // otherwise, place it at the next higher layer that hasn't been assigned
-      if (id2layer.hasOwnProperty(outputNodeID)) {
-        currentLayer = 1;
-      }
+      iter++;
+      if (iter > 100) throw new Error ('too many iterations! cannot converge');
     }
 
 
+    // also traverse from output node, to look for orphaned nodes
+
+
+    // populate new network layers, using the old network as reference for ordering
+    // orphaned nodes are returned in an array
+    this.network  = this.assignLayers(id2layer);
+
     this.node2layer = id2layer;
-    this.network = newNetwork;
+
 
     this.recomputeLongLinks();
   }
@@ -395,7 +392,30 @@ export class Node {
     }
     index = this.inputLinks.map(function(x) {return x.source.id; }).indexOf(node.id);
     return index > -1;
+  }
 
+  willNotBeCycleIfLinkedTo(node:Node) : boolean {
+    let toVisit = [node];
+    let visited = [];
+    let iter = 0;
+
+    while (toVisit.length > 0) {
+      let nd = toVisit.pop();
+
+      if (visited.indexOf(nd.id)>0) continue;
+      visited.push(nd.id);
+
+      if (nd.id == this.id) return false; // this node can be reached from the other node
+
+      nd.outputs.forEach((link)=>{
+        toVisit.push(link.dest);
+      });
+
+      iter++;
+      if (iter > 100) throw new Error ("There is probably a cycle present");
+    }
+
+    return true;
   }
 }
 
