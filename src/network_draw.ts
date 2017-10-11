@@ -49,7 +49,7 @@ function d3updateLinks(netUI:NetworkUI){
 
   // JOIN new data with old elements.
   let links = d3.select("g.core")
-    .selectAll("g.link")
+    .selectAll("g.link-group")
     .data(linkList, function (d) {
       return d.link.id;
     });
@@ -62,7 +62,7 @@ function d3updateLinks(netUI:NetworkUI){
   // Create new elements as needed.
   links.enter()
     .insert("g")
-    .classed("link", true)
+    .classed("link-group", true)
     .style("opacity", 0)
     .each(drawLink)
     .transition()
