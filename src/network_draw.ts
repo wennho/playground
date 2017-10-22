@@ -527,7 +527,7 @@ function selectNode(div, node : nn.Node) {
     }
 
     n.addLink(fromNode, toNode);
-    d3.select('#info').text('Link between nodes ' + node.id + ' and ' + selectedNode.id + ' created.');
+    d3.select('#info').text('Link from node ' + fromNode.id + ' to ' + toNode.id + ' created.');
     selectedNode = null;
     selectedDiv.classed("selected", false);
     selectedDiv = null;

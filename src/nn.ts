@@ -226,7 +226,7 @@ export class Network {
     // assign layers via propagation from input nodes
     // breadth-first traversal is not suitable because there could be back-linkages that need extra layers
     while (toVisit.length > 0) {
-      let node = toVisit.pop();
+      let node = toVisit.shift(); // use shift instead of pop so that elements are first-in-first-out
 
       let nodeLayer = id2layer[node.id];
 
