@@ -19,7 +19,7 @@ import * as dataset from "./dataset";
 
 export const enum Mode {
   None,
-  DeleteEdge,
+  Delete,
   AddEdge,
 }
 

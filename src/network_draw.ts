@@ -82,8 +82,8 @@ function d3updateNodes(netUI:NetworkUI){
   // JOIN new data with old elements.
   let canvasNodes =
     d3.select("#network")
-    .selectAll("div.canvas")
-    .data(netUI.nodes, function (d) { return d.id;});
+      .selectAll("div.canvas")
+      .data(netUI.nodes, function (d) { return d.id;});
   let svgNodes =
     d3.select("g.core")
       .selectAll("g.node")
@@ -307,7 +307,7 @@ function updateHoverCard(type: ElementType, nodeOrLink?: nn.Node | nn.Link,
   // actions when the node or link is clicked
   d3.select("#svg").on("click", () => {
 
-    if (state.mode === Mode.DeleteEdge && nodeOrLink instanceof nn.Link) {
+    if (state.mode === Mode.Delete && nodeOrLink instanceof nn.Link) {
       n.removeLink(nodeOrLink);
       let hovercard = d3.select("#hovercard");
       hovercard.style("display", "none");
@@ -484,8 +484,8 @@ function drawLink(d:LinkData) {
     .on("mouseenter", function() {
       updateHoverCard(ElementType.LINK, link, d3.mouse(this));
     }).on("mouseleave", function() {
-      updateHoverCard(null);
-    });
+    updateHoverCard(null);
+  });
 }
 
 let selectedNode : nn.Node = null;
@@ -550,11 +550,19 @@ function drawNodeCanvas(d : ElementUI){
   let x = d.cx - RECT_SIZE / 2;
   let y = d.cy - RECT_SIZE / 2;
 
-  // Draw the node's canvas.
+  function resetHeatmap() {
+    selectedNodeId = null;
+    div.classed("hovered", false);
+    updateDecisionBoundary(n.network, false);
+    heatMap.updateBackground(boundary[n.getOutputNode().id],
+      state.discretize);
+  }
+
+// Draw the node's canvas.
   div.attr({
-      "id": `canvas-${d.id}`,
-      "class": "canvas"
-    })
+    "id": `canvas-${d.id}`,
+    "class": "canvas"
+  })
     .style({
       position: "absolute",
       left: `${x + 3}px`,
@@ -567,15 +575,15 @@ function drawNodeCanvas(d : ElementUI){
       heatMap.updateBackground(boundary[d.id], state.discretize);
     })
     .on("mouseleave", function() {
-      selectedNodeId = null;
-      div.classed("hovered", false);
-      updateDecisionBoundary(n.network, false);
-      heatMap.updateBackground(boundary[n.getOutputNode().id],
-        state.discretize);
+      resetHeatmap();
     })
     .on("click", function(){
       if (state.mode == Mode.AddEdge) {
         selectNode(div, n.id2node[d.id]);
+      } else if (state.mode == Mode.Delete) {
+        resetHeatmap();
+        n.removeNode(n.id2node[d.id]);
+        reset();
       }
     });
 
@@ -679,11 +687,7 @@ function drawNode(d:ElementUI) {
       y: RECT_SIZE + 13,
       "text-anchor": "start"
     });
-    text.append("tspan").text('Remove');
-    text.on("click", function() {
-      n.removeNode(n.id2node[d.id]);
-      reset();
-    });
+    text.append("tspan").text('Node ' + d.id);
     text.style("cursor", "pointer");
 
 
@@ -705,10 +709,10 @@ function drawNode(d:ElementUI) {
         width: BIAS_SIZE,
         height: BIAS_SIZE,
       }).on("mouseenter", function() {
-      updateHoverCard(ElementType.NODE, n.id2node[d.id], d3.mouse(nodeGroup.node().parentNode));
-    }).on("mouseleave", function() {
-      updateHoverCard(null);
-    });
+        updateHoverCard(ElementType.NODE, n.id2node[d.id], d3.mouse(nodeGroup.node().parentNode));
+      }).on("mouseleave", function() {
+        updateHoverCard(null);
+      });
   }
 
 }

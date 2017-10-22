@@ -242,8 +242,8 @@ function makeGUI() {
   discretize.property("checked", state.discretize);
 
   d3.selectAll('input[name="mode"]').on("change", function() {
-    if (this.value == 'deleteEdge') {
-      state.mode = Mode.DeleteEdge;
+    if (this.value == 'delete') {
+      state.mode = Mode.Delete;
     } else if (this.value == 'addEdge') {
       state.mode = Mode.AddEdge;
     } else {
