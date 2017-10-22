@@ -171,6 +171,36 @@ export class Network {
       return node;
   }
 
+  splitNode(node:Node) {
+    let layer =  this.node2layer[node.id];
+    let layerPos = this.network[layer].indexOf(node);
+
+    this.nextNodeId++;
+    let newNode = new Node(this.nextNodeId.toString(), this.activation, this.initZero);
+    this.network[layer].splice(layerPos+1, 0, newNode); // add after the current node
+    this.node2layer[newNode.id] = layer;
+    this.id2node[newNode.id] = newNode;
+
+    // copy input links
+    node.inputLinks.forEach( link => {
+      let newLink = this.addLink(link.source, newNode);
+      newLink.weight = link.weight;
+    }, this);
+
+    // copy output links. halve weights so that the output is not affected.
+    node.outputs.forEach( link => {
+      let newLink = this.addLink(newNode, link.dest);
+      link.weight /= 2;
+      newLink.weight = link.weight;
+    }, this);
+
+    // copy bias
+    newNode.bias = node.bias;
+
+    return newNode;
+  }
+
+
   addInput(nodeId) {
     let node = new Node(nodeId, this.activation, this.initZero);
     this.network[0].push(node);
@@ -319,7 +349,7 @@ export class Network {
     this.recomputeLongLinks();
   }
 
-  addLink(fromNode:Node, toNode:Node) {
+  addLink(fromNode:Node, toNode:Node) : Link {
 
     let link = new Link(fromNode, toNode, this.regularization, this);
     fromNode.outputs.push(link);
@@ -328,6 +358,7 @@ export class Network {
       this.longLinks.push(link);
     }
 
+    return link;
   }
 
   removeLink(link:Link) {

@@ -21,6 +21,7 @@ export const enum Mode {
   None,
   Delete,
   AddEdge,
+  SplitNode,
 }
 
 /** Suffix added to the state when storing if a control is hidden or not. */

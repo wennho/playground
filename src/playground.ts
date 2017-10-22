@@ -246,6 +246,8 @@ function makeGUI() {
       state.mode = Mode.Delete;
     } else if (this.value == 'addEdge') {
       state.mode = Mode.AddEdge;
+    } else if (this.value == 'splitNode') {
+      state.mode = Mode.SplitNode;
     } else {
       state.mode = Mode.None;
     }

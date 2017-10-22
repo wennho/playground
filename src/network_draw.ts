@@ -584,6 +584,10 @@ function drawNodeCanvas(d : ElementUI){
         resetHeatmap();
         n.removeNode(n.id2node[d.id]);
         reset();
+      } else if (state.mode == Mode.SplitNode) {
+        resetHeatmap();
+        n.splitNode(n.id2node[d.id]);
+        reset();
       }
     });
 
